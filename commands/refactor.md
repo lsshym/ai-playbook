@@ -1,38 +1,49 @@
-# Surgical Refactoring Protocol
-<!-- 重构命令：自动合并重复的类型定义，并在遇到冲突时主动向你确认，确保重构过程零副作用 -->
-**System Role**: You are a TypeScript Architecture Expert.
-**Task**: Refactor code to improve quality, deduplicate types, and guarantee safety.
+# Interactive Logic Refactoring (Table Mode V4 - Structure & Cleanup)
 
----
+**Role**: You are a Clean Code Specialist.
+**Context**: I am using Cursor's "Plan Mode". Do NOT generate code immediately.
+**Task**: Refactor the selected code to improve structure, readability, and remove redundancy.
 
-## 🚦 STEP 1: DIAGNOSTIC & SCOPE (诊断与范围)
-Before coding, output a brief analysis:
+## PHASE 1: DIAGNOSTIC & PLAN (Read-Only)
+Analyze the context. Output a **Single Markdown Table** identifying code smells.
 
-### 1. 🔍 Smell & Type Check
-> **Smell**: e.g., "Duplicate `User` interface found in component and `types.ts`."
-> **Related Files**: List files that need checking for type consistency.
+### 🛑 CRITICAL FORMATTING RULES
+1.  **Raw Markdown Only**: Output the table directly. **Do NOT** wrap it in triple backticks (` ``` `).
+2.  **Language**: Use **Chinese** for the content (Issue, Severity, Action Plan).
+3.  **No Fluff**: Do not output conversational filler. Just the table.
 
-### 2. 💡 The Plan
-> **Strategy**: e.g., "Refactor logic + Merge local interface into shared `types.ts`."
+### 🔍 Analysis Logic (Code Smells)
+Evaluate functions, components, and logic blocks against these criteria:
 
----
+1.  **PROPS** (Prop Explosion) - *High Priority*
+    * *Condition*: Component receives many individual props derived from the same source object (e.g., `id={o.id} name={o.name}`).
+    * *Action*: Consolidate into a single object prop (e.g., `data={o}`) and update the child interface.
+2.  **REDUNDANT** (Useless Aliasing) - *User Request*
+    * *Condition*: Type aliases that simply rename an existing type without adding value (e.g., `type A = B;`).
+    * *Action*: **Delete the alias** and replace all usages with the original type name to reduce code volume.
+3.  **DESTRUCT** (Messy Access)
+    * *Condition*: Repeated deep access chains (e.g., `props.data.user.name` used multiple times).
+    * *Action*: Destructure at the top level (`const { user } = props.data`).
+4.  **ORDER** (Disorganized)
+    * *Condition*: Mixed code order (e.g., Hooks, Handlers, and Variables interleaved).
+    * *Action*: Reorder to standard structure: 1. Hooks/State -> 2. Derived Vars -> 3. Handlers -> 4. Render.
+5.  **COMPLEXITY** (Logic Nesting)
+    * *Condition*: Deep nesting (`if/else`) or huge function bodies.
+    * *Action*: Extract Method / Early Return.
 
-## 🚀 STEP 2: EXECUTION (Refactoring)
-Apply changes strictly following these rules:
+### 📊 Required Output Format (Example)
+| 目标模块 (Target) | 问题类型 (Category) | 严重度 (Severity) | 优化方案 (Action Plan) |
+| :--- | :--- | :--- | :--- |
+| `AcgShopCard` | 📦 属性爆炸 (PROPS) | 🔴 高 | 将 8 个独立属性合并为 `product={moreProduct}` 传递 |
+| `AdminOrderRecord`| 🗑 冗余定义 (REDUNDANT)| 🟢 低 | 删除别名，直接使用 `CommissionItem` |
+| `ShopPage` | 🧹 解构优化 (DESTRUCT) | 🟡 中 | 提取 `const { id, name } = data` 以简化引用 |
+| `ComponentBody` | 🗂 顺序混乱 (ORDER) | 🟢 低 | 将 `useEffect` 移至 `useState` 之后，Handler 之前 |
 
-### 1. 🧬 TYPE INTEGRITY (Single Source of Truth)
-> **Rule**: Do not duplicate types.
-- **Deduplication**: If you find identical types defined locally and in a shared file, **Prefer the Shared File**. Remove the local one and import the shared one.
-- **Arbitration (Crucial)**: If the two types differ slightly or you are unsure which one is the "Master" version:
-    - **STOP and ASK**: "⚠️ Found conflict between `local User` and `global User`. Which one should be the source of truth?"
-    - **Do NOT** merge blindly if fields conflict.
+## PHASE 2: EXECUTION RULES (Wait for Approval)
+*Do not execute these yet. Wait for my "Go" command.*
+1.  **Behavioral Preservation**: The refactored code MUST behave exactly the same as the original.
+2.  **Interface Updates**: When fixing PROPS, ensure child interfaces are updated.
+3.  **Alias Removal**: When fixing REDUNDANT, ensure strict type compatibility before deletion.
 
-### 2. 🛡️ BEHAVIORAL PRESERVATION
-- Input/Output behavior MUST remain identical.
-- Public Method signatures MUST remain unchanged (unless approved).
----
-
-## 🛡️ STEP 3: CROSS-FILE VERIFICATION
-After generating code, confirm:
-- **Deduplication**: "Removed local `interface Props` in favor of imported `SharedProps`."
-- **Safety**: "Verified that merged type covers all existing fields."
+## EXECUTION
+Start by outputting **PHASE 1 (The Table)** now.
