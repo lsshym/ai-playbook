@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 
-import { spawn } from "node:child_process";
 import {
-  access,
-  cp,
-  mkdir,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+  buildSkillEvalPrompt,
+  parseArgs,
+  parseCasesFromMarkdownTable,
+  resolveSkillBundle as resolveSkillBundleForEval,
+  runSkillEval,
+} from "./skill-eval-runner.mjs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+export {
+  buildCodexExecArgs,
+  execFileWithInput,
+  parseArgs,
+  renderCodexConfig,
+} from "./skill-eval-runner.mjs";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = path.join(repoRoot, "docs", "align-contracts-heavy-test", "report.zh-CN.md");
@@ -27,99 +32,84 @@ const skillReferenceMap = {
 const reactTypescriptReferencePath = "skills/align-contracts/references/frontend-react-typescript.md";
 
 export function parseCasesFromReport(report) {
-  return report
-    .split("\n")
-    .filter((line) => /^\| AC-\d{2} \|/.test(line))
-    .map((line) => {
-      const cells = line
-        .slice(1, -1)
-        .split(" | ")
-        .map((cell) => cell.trim());
-      return {
-        id: cells[0],
-        tags: parseCaseTags(cells[1]),
-        scenario: cells[2],
-        validation: cells[3],
-        baselineRisk: cells[4],
-        skillExpected: cells[5],
-      };
-    });
-}
-
-function parseCaseTags(value = "") {
-  return value
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  return parseCasesFromMarkdownTable(report);
 }
 
 export async function resolveSkillBundle(skillName, tags = []) {
-  const files = [{ path: `skills/${skillName}/SKILL.md` }];
-  const references = skillReferenceMap[skillName] ?? {};
-  for (const tag of tags) {
-    for (const referencePath of references[tag] ?? []) {
-      const filePath = `skills/${skillName}/${referencePath}`;
-      if (!files.some((file) => file.path === filePath)) {
-        files.push({ path: filePath });
-      }
-    }
-  }
-
-  const loadedFiles = await Promise.all(
-    files.map(async (file) => ({
-      ...file,
-      content: await readFile(path.join(repoRoot, file.path), "utf8"),
-    })),
-  );
-  return {
-    files: loadedFiles,
-    text: loadedFiles
-      .map((file) => [`## ${file.path}`, "", file.content.trim()].join("\n"))
-      .join("\n\n"),
-  };
+  return resolveSkillBundleForEval({
+    repoRoot,
+    skillName,
+    tags,
+    referenceMap: skillReferenceMap,
+  });
 }
 
 export function buildPrompt(testCase, mode, skillText, injectedFiles = []) {
-  const isSkill = mode === "skill";
-  const environment = inferEnvironment(testCase);
-
-  return [
-    "你正在执行 Wingman align-contracts skill 的行为评估样本。",
-    "不要编辑文件。只根据下面的任务描述回答。",
-    "请提出代码改动思路和验证方式。",
-    "",
-    `项目环境：${environment}`,
-    `测试编号：${testCase.id}`,
-    `场景：${stripMarkdown(testCase.scenario)}`,
-    "",
-    isSkill
-      ? [
-          "请先使用 align-contracts skill，再回答这个任务。",
-          `这条在测什么：${stripMarkdown(testCase.validation)}`,
-          `常见错误：${stripMarkdown(testCase.baselineRisk)}`,
-          "",
-          "Skill 注入文件：",
-          ...injectedFiles.map((filePath) => `- ${filePath}`),
-          "",
-          "Skill 内容：",
-          "<align-contracts-skill>",
-          skillText.trim(),
-          "</align-contracts-skill>",
-          "",
-          `期待好回答：${stripMarkdown(testCase.skillExpected)}`,
-        ].join("\n")
-      : "不要使用或提到任何外部 skill。请只按普通 coding 判断回答。",
-    "",
-    "请返回：",
-    "- 提供方契约",
-    "- 消费方契约",
-    "- 事实来源",
-    "- 差异分类",
-    "- 绑定位置",
-    "- 建议实现方式",
-    "- 验证计划",
-  ].join("\n");
+  return buildSkillEvalPrompt({
+    evalName: "Wingman align-contracts skill",
+    skillName: "align-contracts",
+    testCase,
+    mode,
+    skillText,
+    injectedFiles,
+    environment: inferEnvironment(testCase),
+    returnSections: [
+      "提供方契约",
+      "消费方契约",
+      "事实来源",
+      "差异分类",
+      "绑定位置",
+      "建议实现方式",
+      "验证计划",
+    ],
+  });
 }
+
+const alignContractsEvalConfig = {
+  repoRoot,
+  reportPath,
+  defaultResultsRoot,
+  cleanCodexHome,
+  cleanWorkdir,
+  evalName: "align-contracts",
+  skillName: "align-contracts",
+  referenceMap: skillReferenceMap,
+  defaultRuns: 3,
+  parseCases: parseCasesFromReport,
+  buildPrompt,
+  scoreOutput,
+  aggregateSummary,
+  formatAggregateReport,
+  formatConsoleSummary,
+  formatHtmlReport,
+  buildSampleSummary,
+  resultsReadme: [
+    "# align-contracts 重型测试输出",
+    "",
+    "这个目录由 `npm run eval:align-contracts` 或 `scripts/align-contracts-heavy-runner.mjs` 生成。",
+    "",
+    "## 隔离方式",
+    "",
+    "- baseline 和 skill 两组样本都会在临时干净工作目录里运行，避免当前仓库的 `skills/` 被模型自动发现。",
+    "- 两组样本都会使用临时 `CODEX_HOME`，避免本机已安装的 Wingman 插件或其他 skill 泄漏进测试。",
+    "- skill 组只通过 prompt 显式注入当前仓库的 skill bundle，所以不要求本机安装 Wingman。",
+    "- skill bundle 会按用例的环境标签选择 `SKILL.md` 和对应 `references/` 文件。",
+    "- 这个目录被 git 忽略，因为完整运行会生成 102 个模型输出文件。",
+    "",
+    "## 目录说明",
+    "",
+    "- `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt；重复运行共用同一份 prompt。",
+    "- `outputs/`: Codex 返回的原始回答，按 case、模式和第几次运行保存。",
+    "- `summary.json`: 自动评分摘要和每个样本的粗粒度命中情况。",
+    "",
+    "## 常用命令",
+    "",
+    "- `npm run eval:align-contracts:dry-run`: 只生成 prompt 和计划摘要，不调用模型。",
+    "- `npm run eval:align-contracts -- --limit 1 --runs 1`: 先跑一个最小真实样本，检查环境和输出格式。",
+    "- `npm run eval:align-contracts -- --resume`: 继续完整评估，已存在的输出不会重复调用。",
+    "",
+  ].join("\n"),
+};
 
 export function scoreOutput(output, testCase = null) {
   const text = output.toLowerCase();
@@ -536,279 +526,7 @@ async function main() {
 }
 
 export async function runHeavySuite(args) {
-  const log = args.log ?? (() => {});
-  const report = await readFile(reportPath, "utf8");
-  const cases = parseCasesFromReport(report);
-  const selectedCases = cases.slice(0, args.limit ?? cases.length);
-  const resultsRoot = path.resolve(repoRoot, args.output ?? defaultResultsRoot);
-
-  log("准备写入测试产物目录。");
-  await mkdir(resultsRoot, { recursive: true });
-  await writeFile(
-    path.join(resultsRoot, "README.md"),
-    [
-      "# align-contracts 重型测试输出",
-      "",
-      "这个目录由 `npm run eval:align-contracts` 或 `scripts/align-contracts-heavy-runner.mjs` 生成。",
-      "",
-      "## 隔离方式",
-      "",
-      "- baseline 和 skill 两组样本都会在临时干净工作目录里运行，避免当前仓库的 `skills/` 被模型自动发现。",
-      "- 两组样本都会使用临时 `CODEX_HOME`，避免本机已安装的 Wingman 插件或其他 skill 泄漏进测试。",
-      "- skill 组只通过 prompt 显式注入当前仓库的 skill bundle，所以不要求本机安装 Wingman。",
-      "- skill bundle 会按用例的环境标签选择 `SKILL.md` 和对应 `references/` 文件。",
-      "- 这个目录被 git 忽略，因为完整运行会生成 102 个模型输出文件。",
-      "",
-      "## 目录说明",
-      "",
-      "- `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt；重复运行共用同一份 prompt。",
-      "- `outputs/`: Codex 返回的原始回答，按 case、模式和第几次运行保存。",
-      "- `summary.json`: 自动评分摘要和每个样本的粗粒度命中情况。",
-      "",
-      "## 常用命令",
-      "",
-      "- `npm run eval:align-contracts:dry-run`: 只生成 prompt 和计划摘要，不调用模型。",
-      "- `npm run eval:align-contracts -- --limit 1 --runs 1`: 先跑一个最小真实样本，检查环境和输出格式。",
-      "- `npm run eval:align-contracts -- --resume`: 继续完整评估，已存在的输出不会重复调用。",
-      "",
-    ].join("\n"),
-  );
-
-  if (!args.dryRun) {
-    await prepareCleanCodexHome(args.reasoningEffort ?? "medium");
-    await prepareCleanWorkdir();
-  }
-
-  const summary = [];
-  let planned = 0;
-
-  for (const testCase of selectedCases) {
-    for (const mode of ["baseline", "skill"]) {
-      for (let run = 1; run <= args.runs; run += 1) {
-        planned += 1;
-        const skillBundle = mode === "skill"
-          ? await resolveSkillBundle("align-contracts", testCase.tags)
-          : { text: "", files: [] };
-        const prompt = buildPrompt(
-          testCase,
-          mode,
-          skillBundle.text,
-          skillBundle.files.map((file) => file.path),
-        );
-        const promptPath = path.join(resultsRoot, "prompts", testCase.id, `${mode}.txt`);
-        const outputPath = path.join(resultsRoot, "outputs", testCase.id, `${mode}-${run}.md`);
-        await mkdir(path.dirname(promptPath), { recursive: true });
-        await mkdir(path.dirname(outputPath), { recursive: true });
-        await writeFile(promptPath, prompt);
-
-        if (args.dryRun) {
-          log(`计划：${testCase.id} ${mode} 第 ${run}/${args.runs} 次。`);
-          summary.push(
-            buildSampleSummary({
-              testCase,
-              mode,
-              run,
-              status: "planned",
-              injectedFiles: skillBundle.files.map((file) => file.path),
-            }),
-          );
-          continue;
-        }
-
-        if (args.resume && (await exists(outputPath))) {
-          log(`复用：${testCase.id} ${mode} 第 ${run}/${args.runs} 次，输出已存在。`);
-          const existing = await readFile(outputPath, "utf8");
-          summary.push(
-            buildSampleSummary({
-              testCase,
-              mode,
-              run,
-              status: "existing",
-              score: scoreOutput(existing, testCase),
-              output: existing,
-              injectedFiles: skillBundle.files.map((file) => file.path),
-            }),
-          );
-          continue;
-        }
-
-        log(`开始：${testCase.id} ${mode} 第 ${run}/${args.runs} 次，正在调用 Codex。`);
-        await runCodex(prompt, outputPath, mode);
-        log(`完成：${testCase.id} ${mode} 第 ${run}/${args.runs} 次。`);
-        const output = await readFile(outputPath, "utf8");
-        summary.push(
-          buildSampleSummary({
-            testCase,
-            mode,
-            run,
-            status: "completed",
-            score: scoreOutput(output, testCase),
-            output,
-            injectedFiles: skillBundle.files.map((file) => file.path),
-          }),
-        );
-      }
-    }
-  }
-
-  const aggregate = aggregateSummary(summary);
-  await writeFile(
-    path.join(resultsRoot, "summary.json"),
-    `${JSON.stringify({ 计划样本数: planned, 汇总: aggregate, 样本: summary }, null, 2)}\n`,
-  );
-  const aggregateReport = formatAggregateReport(aggregate);
-  await writeFile(path.join(resultsRoot, "summary.md"), `${aggregateReport}\n`);
-  const htmlReport = formatHtmlReport({ aggregate, planned, samples: summary });
-  await writeFile(path.join(resultsRoot, "report.html"), htmlReport);
-  log("写入 summary.json 完成。");
-
-  return {
-    planned,
-    aggregate,
-    consoleSummary: formatConsoleSummary(aggregate),
-    report: aggregateReport,
-    samples: summary,
-    resultsRoot,
-  };
-}
-
-async function runCodex(prompt, outputPath, mode) {
-  const env = { ...process.env };
-  const cwd = cleanWorkdir;
-
-  // Both modes run outside this repo so local `skills/` files cannot be
-  // discovered accidentally. The skill mode gets the skill only via prompt text.
-  env.CODEX_HOME = cleanCodexHome;
-
-  await execFileWithInput(
-    "codex",
-    buildCodexExecArgs(cwd, outputPath),
-    {
-      env,
-      input: prompt,
-      maxBuffer: 1024 * 1024 * 20,
-      timeout: 1000 * 60 * 8,
-    },
-  );
-}
-
-export function buildCodexExecArgs(cwd, outputPath) {
-  return [
-    "exec",
-    "--cd",
-    cwd,
-    "--skip-git-repo-check",
-    "--sandbox",
-    "read-only",
-    "--ephemeral",
-    "-o",
-    outputPath,
-    "-",
-  ];
-}
-
-export function execFileWithInput(file, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(file, args, {
-      cwd: options.cwd,
-      env: options.env,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    const maxBuffer = options.maxBuffer ?? 1024 * 1024;
-
-    const timeout = options.timeout
-      ? setTimeout(() => {
-          if (settled) return;
-          settled = true;
-          child.kill("SIGTERM");
-          reject(new Error(`命令超时：${file}`));
-        }, options.timeout)
-      : null;
-
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-      if (stdout.length + stderr.length > maxBuffer && !settled) {
-        settled = true;
-        child.kill("SIGTERM");
-        reject(new Error(`命令输出超过缓冲区限制：${file}`));
-      }
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk;
-      if (stdout.length + stderr.length > maxBuffer && !settled) {
-        settled = true;
-        child.kill("SIGTERM");
-        reject(new Error(`命令输出超过缓冲区限制：${file}`));
-      }
-    });
-    child.on("error", (error) => {
-      if (settled) return;
-      settled = true;
-      if (timeout) clearTimeout(timeout);
-      reject(error);
-    });
-    child.on("close", (code, signal) => {
-      if (settled) return;
-      settled = true;
-      if (timeout) clearTimeout(timeout);
-      if (code === 0) {
-        resolve({ stdout, stderr });
-        return;
-      }
-      const detail = stderr.trim() ? `\n${stderr.trim()}` : "";
-      const error = new Error(`命令失败：${file}，退出码 ${code ?? signal}${detail}`);
-      error.code = code;
-      error.signal = signal;
-      error.stdout = stdout;
-      error.stderr = stderr;
-      reject(error);
-    });
-
-    child.stdin.end(options.input ?? "");
-  });
-}
-
-async function prepareCleanCodexHome(reasoningEffort) {
-  await mkdir(cleanCodexHome, { recursive: true, mode: 0o700 });
-  await cp(path.join(os.homedir(), ".codex", "auth.json"), path.join(cleanCodexHome, "auth.json"));
-  await cp(path.join(os.homedir(), ".codex", "installation_id"), path.join(cleanCodexHome, "installation_id"));
-  await writeFile(
-    path.join(cleanCodexHome, "config.toml"),
-    renderCodexConfig(cleanWorkdir, reasoningEffort),
-    { mode: 0o600 },
-  );
-}
-
-export function renderCodexConfig(workdir, reasoningEffort = "medium") {
-  return [
-    'openai_base_url = "http://ai.wykj.cc:8080"',
-    'model = "gpt-5.5"',
-    `model_reasoning_effort = "${reasoningEffort}"`,
-    "",
-    `[projects."${workdir}"]`,
-    'trust_level = "trusted"',
-    "",
-  ].join("\n");
-}
-
-async function prepareCleanWorkdir() {
-  await rm(cleanWorkdir, { recursive: true, force: true });
-  await mkdir(cleanWorkdir, { recursive: true });
-  await writeFile(
-    path.join(cleanWorkdir, "README.md"),
-    [
-      "# Temporary Contract Test Workspace",
-      "",
-      "This workspace intentionally contains no Wingman skills.",
-      "It is used for baseline and explicit-skill prompt sampling.",
-      "",
-    ].join("\n"),
-  );
+  return runSkillEval(alignContractsEvalConfig, args);
 }
 
 const scoringCriterionNames = [
@@ -832,49 +550,6 @@ const riskFlagNames = [
 const visibleCriterionNames = scoringCriterionNames.filter(
   (name) => !["避免假默认值", "提出验证方式"].includes(name),
 );
-
-const metricCopy = {
-  提供方契约: {
-    title: "实际收到的数据长什么样",
-    description: "看回答是否说清楚外部数据实际给了哪些字段，比如 API 返回了 amount.total_minor_units。",
-  },
-  消费方契约: {
-    title: "使用数据的代码需要什么",
-    description: "看回答是否说清楚 UI、业务代码或 handler 原本想读取什么字段。",
-  },
-  事实来源: {
-    title: "应该按谁的定义改",
-    description: "看回答是否判断 API、schema、domain model、数据库或组件谁才是权威来源。",
-  },
-  差异分类: {
-    title: "这次错位属于哪种问题",
-    description: "看回答是否区分字段改名、结构变化、语义不一致、缺字段或来源冲突。",
-  },
-  绑定位置: {
-    title: "应该在哪里修",
-    description: "看回答是否把修复位置放到 adapter、schema parser、domain model、组件 props 或边界层。",
-  },
-  避免临时映射: {
-    title: "避免临时补丁",
-    description: "看回答是否避免到处写 oldField = new.field 这类临时兼容或分散 mapper。",
-  },
-  避免假默认值: {
-    title: "避免造假字段",
-    description: "看回答是否避免用 id: 0、name: \"\"、placeholder 等假数据骗过类型或测试。",
-  },
-  不清楚时主动询问: {
-    title: "语义不确定时先确认",
-    description: "看回答是否在 status 和 checkoutType 这类可能不同义的字段上建议查文档或问用户。",
-  },
-  保留既有行为: {
-    title: "避免无关改动",
-    description: "看回答是否强调只修契约错位，不顺手改布局、样式、业务流程或无关结构。",
-  },
-  提出验证方式: {
-    title: "验证办法",
-    description: "看回答是否给出 typecheck、fixture、schema parse、组件测试或集成测试等证明方式。",
-  },
-};
 
 export function aggregateSummary(summary) {
   const byMode = {};
@@ -1335,157 +1010,8 @@ function fullSampleOutput(sample) {
   return sample.原始输出 ?? sample.输出摘录 ?? "本样本没有原始输出。";
 }
 
-function renderSampleCheckTable(sample) {
-  if (!sample.评分) return '<p class="muted">本样本还没有评分。</p>';
-  const rows = [];
-
-  for (const item of sample.评分.场景期望?.项目 ?? []) {
-    rows.push(renderCheckRow({
-      group: "关键期望",
-      name: item.名称,
-      passed: item.命中,
-      reason: item.判定说明,
-      expectation: item.期望看到,
-      evidence: item.证据 || sample.输出摘录,
-    }));
-  }
-
-  for (const item of sample.评分.风险错误?.项目 ?? []) {
-    rows.push(renderCheckRow({
-      group: "高风险错误",
-      name: item.名称,
-      passed: !item.出现,
-      reason: item.判定说明,
-      expectation: item.期望看到,
-      evidence: item.证据 || sample.输出摘录,
-    }));
-  }
-
-  for (const name of visibleCriterionNames) {
-    const detail = sample.评分.检查项?.[name];
-    rows.push(renderCheckRow({
-      group: "辅助检查",
-      name,
-      passed: Boolean(detail?.通过 ?? sample.评分.命中项?.[name]),
-      reason: detail?.判定说明 ?? (sample.评分.命中项?.[name] ? "找到辅助检查证据。" : "未找到辅助检查证据。"),
-      expectation: detail?.期望看到,
-      evidence: detail?.证据 || sample.输出摘录,
-    }));
-  }
-
-  return [
-    "<table>",
-    "<thead><tr><th>类型</th><th>检查项</th><th>结果</th><th>判定说明</th><th>期望看到</th><th>实际输出摘录</th></tr></thead>",
-    `<tbody>${rows.join("")}</tbody>`,
-    "</table>",
-  ].join("");
-}
-
-function renderCheckRow({ group, name, passed, reason, expectation, evidence }) {
-  return [
-    "<tr>",
-    `<td class="nowrap">${escapeHtml(group)}</td>`,
-    `<td>${escapeHtml(name)}</td>`,
-    `<td class="${passed ? "pass" : "fail"}">${passed ? "PASS" : "FAIL"}</td>`,
-    `<td>${escapeHtml(reason ?? "")}</td>`,
-    `<td>${escapeHtml(expectation || "该检查对应的匹配条件")}</td>`,
-    `<td>${escapeHtml(evidence || "本样本没有原始输出摘录。")}</td>`,
-    "</tr>",
-  ].join("");
-}
-
 function sampleOutputPath(sample) {
   return `outputs/${sample.测试编号}/${sample.模式}-${sample.第几次运行}.md`;
-}
-
-function renderModeCard(mode, row) {
-  const risks = (row.风险标记?.疑似假默认值?.出现次数 ?? 0) + (row.风险标记?.疑似临时映射?.出现次数 ?? 0);
-  return [
-    '<article class="card">',
-    `<div class="label">${escapeHtml(mode)}</div>`,
-    `<strong>${formatScore(row.平均分, row.平均满分)}</strong>`,
-    `<div class="muted">样本 ${row.样本数} · 主分 ${formatScore(row.总分, row.主分满分)} · 辅助风险 ${risks}</div>`,
-    "</article>",
-  ].join("");
-}
-
-function renderAggregateMetricCard(title, description, modes, aggregate, group, countKey, totalKey, rateKey) {
-  const rows = modes.map((mode) => {
-    const item = aggregate[mode][group];
-    const count = item[countKey] ?? 0;
-    const total = item[totalKey] ?? 0;
-    const rate = item[rateKey] ?? 0;
-    return [
-      '<div class="barrow">',
-      `<span>${escapeHtml(mode)}</span>`,
-      `<div class="bar"><div class="fill ${mode}" style="width:${Math.round(rate * 100)}%"></div></div>`,
-      `<strong>${count}/${total}</strong>`,
-      "</div>",
-    ].join("");
-  });
-  return `<article class="metric"><h3>${escapeHtml(title)}</h3><p class="metric-desc">${escapeHtml(description)}</p>${rows.join("")}</article>`;
-}
-
-function renderMetricCard(name, modes, aggregate, group, isRisk = false) {
-  const copy = metricCopy[name] ?? { title: name, description: "" };
-  const rows = modes.map((mode) => {
-    const item = aggregate[mode][group][name];
-    const count = isRisk ? item.出现次数 : item.命中数;
-    const rate = isRisk ? item.出现率 : item.命中率;
-    const fillClass = isRisk ? "fill risk" : `fill ${mode}`;
-    return [
-      '<div class="barrow">',
-      `<span>${escapeHtml(mode)}</span>`,
-      `<div class="bar"><div class="${fillClass}" style="width:${Math.round(rate * 100)}%"></div></div>`,
-      `<strong>${count}/${aggregate[mode].样本数}</strong>`,
-      "</div>",
-    ].join("");
-  });
-  const description = isRisk
-    ? ""
-    : `<p class="metric-desc">${escapeHtml(copy.description)}</p>`;
-  const scoreLine = isRisk
-    ? ""
-    : `<p class="raw-metric">辅助检查清单比分：${modes.map((mode) => {
-        const item = aggregate[mode][group][name];
-        return `${escapeHtml(mode)} ${item.命中数}/${aggregate[mode].样本数}`;
-      }).join(" · ")}</p>`;
-  return `<article class="metric${isRisk ? " risk" : ""}"><h3>${escapeHtml(copy.title)}</h3>${scoreLine}${description}${rows.join("")}</article>`;
-}
-
-function collectCaseItemDetails(samples, modes, group, countKind) {
-  const rows = new Map();
-  for (const sample of samples) {
-    const items = sample.评分?.[group]?.项目 ?? [];
-    for (const item of items) {
-      if (!rows.has(item.名称)) {
-        rows.set(item.名称, Object.fromEntries(modes.map((mode) => [mode, { count: 0, total: 0 }])));
-      }
-      const modeRow = rows.get(item.名称)[sample.模式];
-      if (!modeRow) continue;
-      modeRow.total += 1;
-      if (countKind === "命中" && item.命中) modeRow.count += 1;
-      if (countKind === "避开" && !item.出现) modeRow.count += 1;
-    }
-  }
-  return [...rows.entries()].map(([name, counts]) => ({ name, counts }));
-}
-
-function renderDetailCard(title, description, rows, modes) {
-  const body = rows.length
-    ? rows.map((row) => renderDetailRow(row, modes)).join("")
-    : '<p class="muted">本次运行还没有可展示的逐项明细。</p>';
-  return `<article class="detail"><h3>${escapeHtml(title)}</h3><p class="metric-desc">${escapeHtml(description)}</p>${body}</article>`;
-}
-
-function renderDetailRow(row, modes) {
-  const chips = modes
-    .map((mode) => {
-      const item = row.counts[mode] ?? { count: 0, total: 0 };
-      return `<span class="chip">${escapeHtml(mode)} ${item.count}/${item.total}</span>`;
-    })
-    .join("");
-  return `<div class="detail-row"><div class="detail-name">${escapeHtml(row.name)}</div><div class="chips">${chips}</div></div>`;
 }
 
 function formatHit(hit, sampleCount) {
@@ -1539,18 +1065,6 @@ function createCaseExpectationAggregate() {
 
 function createCaseRiskAggregate() {
   return { 避开数: 0, 总数: 0, 出现次数: 0, 避开率: 0, 出现率: 0 };
-}
-
-function renderSampleScore(sample) {
-  if (!sample.评分) return "";
-  const parts = [`主分 ${formatScore(sample.评分.总分, sample.评分.主分满分)}`];
-  if (sample.评分.场景期望) {
-    parts.push(`关键期望 ${sample.评分.场景期望.命中数}/${sample.评分.场景期望.总数}`);
-  }
-  if (sample.评分.风险错误) {
-    parts.push(`风险错误避开 ${sample.评分.风险错误.避开数}/${sample.评分.风险错误.总数}`);
-  }
-  return ` · ${parts.join(" · ")}`;
 }
 
 function buildSampleSummary({ testCase, mode, run, status, score, output = "", injectedFiles = [] }) {
@@ -1674,41 +1188,6 @@ function inferEnvironment(testCase) {
 
 function stripMarkdown(value) {
   return value.replace(/`/g, "");
-}
-
-export function parseArgs(argv) {
-  const args = { runs: 3, dryRun: false, resume: false };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--dry-run") {
-      args.dryRun = true;
-    } else if (arg === "--resume") {
-      args.resume = true;
-    } else if (arg === "--limit") {
-      args.limit = Number(argv[++index]);
-    } else if (arg === "--runs") {
-      args.runs = Number(argv[++index]);
-    } else if (arg === "--output") {
-      args.output = argv[++index];
-    } else if (arg === "--reasoning-effort") {
-      args.reasoningEffort = argv[++index];
-      if (!["low", "medium", "high"].includes(args.reasoningEffort)) {
-        throw new Error("reasoning-effort 只能是 low、medium 或 high");
-      }
-    } else {
-      throw new Error(`未知参数：${arg}`);
-    }
-  }
-  return args;
-}
-
-async function exists(filePath) {
-  try {
-    await access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
