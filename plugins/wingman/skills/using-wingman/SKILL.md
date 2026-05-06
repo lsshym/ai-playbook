@@ -7,7 +7,7 @@ description: Use when starting a Wingman-enabled coding session, adapting Wingma
 
 ## Overview
 
-Wingman is a cross-platform engineering plugin built around reusable skills. Treat `using-wingman` as the plugin entry protocol: it explains how Wingman works, capability discovery, instruction priority, safe editing, language behavior, and platform-specific wrappers.
+Wingman is a cross-platform AI coding plugin built around reusable skills. It gives agents project memory, contract checks, and reuse workflows so they can make steadier code changes with less context loss and duplicated work. Treat `using-wingman` as the plugin entry protocol: it explains how Wingman works, capability discovery, instruction priority, safe editing, language behavior, and platform-specific wrappers.
 
 ## How Wingman Works
 
@@ -32,7 +32,7 @@ Wingman does not try to be a full development methodology. It does not force TDD
 For a user-facing explanation, prefer this shape:
 
 ```markdown
-Wingman is a set of coding-agent skills for working safely inside real projects.
+Wingman is a cross-platform AI coding plugin for working safely inside real projects.
 
 It mainly helps with:
 - project memory: load context before meaningful work, sync important outcomes afterward

@@ -1,12 +1,12 @@
 # Wingman
 
-> A cross-platform AI engineering plugin for execution, context, and reuse.
+> A cross-platform AI coding plugin for steadier code changes.
 
-Wingman packages one shared content core for practical engineering execution, advanced context workflows, and reusable implementation lookup across multiple AI coding platforms.
+Wingman is a cross-platform AI coding plugin that gives agents project memory, contract checks, and reuse workflows so they can make steadier code changes with less context loss and duplicated work.
 
 ## How It Works
 
-Wingman is a set of coding-agent skills for working safely inside real projects. It focuses on three problems agents often run into:
+Wingman packages reusable coding-agent skills for working safely inside real projects across Codex, Cursor, Claude Code, and other AI coding platforms. It focuses on three problems agents often run into:
 
 - **Project memory**: load relevant context before meaningful work and sync durable outcomes afterward.
 - **Contract alignment**: keep API, type, schema, event, config, and UI boundaries honest when shapes or meanings drift.

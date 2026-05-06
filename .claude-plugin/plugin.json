@@ -1,6 +1,6 @@
 {
   "name": "wingman",
-  "description": "Cross-platform AI engineering plugin for execution, context, and reuse.",
+  "description": "Cross-platform AI coding plugin for project memory, contract checks, and reuse workflows.",
   "version": "1.0.0",
   "author": {
     "name": "keni"

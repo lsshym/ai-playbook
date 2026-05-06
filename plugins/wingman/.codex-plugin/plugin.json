@@ -1,7 +1,7 @@
 {
   "name": "wingman",
   "version": "1.0.0",
-  "description": "Cross-platform AI engineering plugin for execution, context, and reuse.",
+  "description": "Cross-platform AI coding plugin for project memory, contract checks, and reuse workflows.",
   "author": {
     "name": "keni"
   },
@@ -21,8 +21,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Wingman",
-    "shortDescription": "Execution, memory, and reuse workflows for coding agents",
-    "longDescription": "Wingman packages reusable engineering skills for contract alignment, durable project memory, reuse selection, and explicit refactor workflows.",
+    "shortDescription": "Project memory, contract checks, and reuse workflows for AI coding agents",
+    "longDescription": "Wingman gives agents reusable skills for loading project memory, aligning API/type contracts, selecting existing implementations, and running explicit refactor workflows.",
     "developerName": "keni",
     "category": "Coding",
     "capabilities": [
