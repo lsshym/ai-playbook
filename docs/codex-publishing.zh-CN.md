@@ -206,18 +206,18 @@ wingman-codex-plugins/
 codex plugin marketplace add lsshym/wingman-codex-plugins
 ```
 
-这个仓库可以用同步脚本更新：
+这个仓库可以用同步脚本显式更新：
 
 ```bash
-npm run sync:codex -- --dest /path/to/wingman-codex-plugins
+bash scripts/sync-to-codex-plugin.sh --dest /path/to/wingman-codex-plugins
 ```
 
-`sync:codex` 会把当前 Wingman 的 Codex payload 同步到目标仓库的 `plugins/wingman/`，并排除 `.agents/`、`.claude-plugin/`、`.cursor-plugin/`、`hooks/`、`tests/`、`scripts/` 等开发/其他平台文件。
+该脚本会把当前 Wingman 的 Codex payload 同步到目标仓库的 `plugins/wingman/`，并排除 `.agents/`、`.claude-plugin/`、`.cursor-plugin/`、`hooks/`、`tests/`、`scripts/` 等开发/其他平台文件。默认 npm scripts 不暴露外部 checkout 同步入口，日常发布只需要 `npm run prepare:codex-local`。
 
 如果目标 marketplace 仓库还没 clone，本脚本也支持 bootstrap，但需要显式提供目标 fork 或 remote：
 
 ```bash
-npm run sync:codex -- --bootstrap --fork your-org/wingman-codex-plugins
+bash scripts/sync-to-codex-plugin.sh --bootstrap --fork your-org/wingman-codex-plugins
 ```
 
 ## Superpowers 是怎么做的

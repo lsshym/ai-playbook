@@ -25,7 +25,6 @@
     "test:package": "node --test tests/package/*.test.mjs",
     "test:behavior": "node --test tests/behavior/*.test.mjs",
     "check:plugin": "node scripts/check-plugin.mjs",
-    "sync:codex": "bash scripts/sync-to-codex-plugin.sh",
     "prepare:codex-local": "bash scripts/sync-to-codex-plugin.sh --dest ."
   },
   "author": "keni",

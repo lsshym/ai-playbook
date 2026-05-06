@@ -245,7 +245,19 @@ test("显式 workflow skill 必须保持只在用户明确请求时触发", asyn
   }
 });
 
-test("Codex 发布同步脚本必须指向 plugins/wingman 嵌入目录", async () => {
+test("package scripts 只暴露本仓库 Codex payload 同步入口", async () => {
+  const packageJson = JSON.parse(
+    await readFile(path.join(repoRoot, "package.json"), "utf8"),
+  );
+
+  assert.equal(packageJson.scripts["sync:codex"], undefined);
+  assert.equal(
+    packageJson.scripts["prepare:codex-local"],
+    "bash scripts/sync-to-codex-plugin.sh --dest .",
+  );
+});
+
+test("Codex payload 同步脚本必须指向 plugins/wingman 嵌入目录", async () => {
   const script = await readFile(
     path.join(repoRoot, "scripts", "sync-to-codex-plugin.sh"),
     "utf8",

@@ -165,7 +165,7 @@ wingman-codex-plugins/
   plugins/wingman/
 ```
 
-当前仓库已有 `npm run sync:codex`，可以用于同步到这类目标仓库。
+如果后续确实需要维护单独 marketplace 仓库，可以复用 `scripts/sync-to-codex-plugin.sh --dest /path/to/wingman-codex-plugins` 这类显式命令同步到目标仓库；当前默认 npm scripts 只保留本仓库内嵌 payload 的 `npm run prepare:codex-local`。
 
 ## 参考链接
 
