@@ -6,7 +6,7 @@ import {
   parseCasesFromMarkdownTable,
   renderCodexConfig,
   resolveSkillBundle as resolveSkillBundleForEval,
-} from "./skill-eval-runner.mjs";
+} from "../_shared/skill-eval-runner.mjs";
 import {
   access,
   cp,
@@ -23,10 +23,10 @@ export {
   execFileWithInput,
   parseArgs,
   renderCodexConfig,
-} from "./skill-eval-runner.mjs";
+} from "../_shared/skill-eval-runner.mjs";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const reportPath = path.join(repoRoot, "docs", "align-contracts-heavy-test", "report.zh-CN.md");
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const casesPath = path.join(repoRoot, "skill-evals", "align-contracts-heavy", "cases.zh-CN.md");
 const defaultResultsRoot = path.join(repoRoot, ".eval-runs", "align-contracts-heavy");
 const cleanCodexHome = path.join(os.tmpdir(), "wingman-align-baseline-codex-home");
 const cleanWorkdirRoot = path.join(os.tmpdir(), "wingman-align-clean-workdirs");
@@ -113,8 +113,8 @@ export function buildCaseFixture(testCase) {
 
 export async function runHeavySuite(args) {
   const log = args.log ?? (() => {});
-  const report = await readFile(reportPath, "utf8");
-  const cases = parseCasesFromReport(report).slice(0, args.limit ?? undefined);
+  const casesDoc = await readFile(casesPath, "utf8");
+  const cases = parseCasesFromReport(casesDoc).slice(0, args.limit ?? undefined);
   const runs = args.runs ?? 3;
   const resultsRoot = path.resolve(repoRoot, args.output ?? defaultResultsRoot);
 
@@ -249,7 +249,7 @@ export function formatAggregateReport(aggregate) {
       return `| ${mode} | ${row.样本数} | ${row.已完成} | ${row.已计划} | ${row.代码快照数} |`;
     }),
     "",
-    "本报告不做正则自动评分。请用 `comparison.json` 或 `report.html` 人工审查 original / baseline / skill 的真实代码改动。",
+    "请用 `comparison.json` 或 `report.html` 人工审查 original / baseline / skill 的真实代码改动。",
   ].join("\n");
 }
 
@@ -290,7 +290,7 @@ export function formatHtmlReport({ aggregate, planned, samples }) {
     "</head>",
     "<body><main>",
     "<h1>align-contracts 代码对比评估报告</h1>",
-    `<p class="muted">计划样本数 ${planned}。本报告不做自动评分，只展示原始 fixture、baseline 改动结果和 skill 改动结果。</p>`,
+    `<p class="muted">计划样本数 ${planned}。本报告只展示原始 fixture、baseline 改动结果和 skill 改动结果。</p>`,
     "<h2>结果总览</h2>",
     renderModeSummaryTable(aggregate),
     "<h2>逐 case 代码对比</h2>",
@@ -697,7 +697,7 @@ function inferEnvironment(testCase) {
 const resultsReadme = [
   "# align-contracts 代码对比评估输出",
   "",
-  "这个目录由 `npm run eval:align-contracts` 或 `scripts/align-contracts-heavy-runner.mjs` 生成。",
+  "这个目录由 `npm run eval:align-contracts` 或 `skill-evals/align-contracts-heavy/runner.mjs` 生成。",
   "",
   "## 目录说明",
   "",
@@ -706,7 +706,7 @@ const resultsReadme = [
   "- `comparisons/`: original、baseline、skill 的真实代码快照。",
   "- `comparison.json`: 面向机器读取的代码快照索引。",
   "- `report.html`: 面向人工审核的三栏代码对比报告。",
-  "- `summary.json`: 样本状态摘要，不包含自动评分。",
+  "- `summary.json`: 样本状态摘要。",
   "",
 ].join("\n");
 

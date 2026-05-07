@@ -9,7 +9,7 @@ import {
   parseCasesFromMarkdownTable,
   resolveSkillBundle,
   runSkillEval,
-} from "../../scripts/skill-eval-runner.mjs";
+} from "../_shared/skill-eval-runner.mjs";
 
 test("generic skill eval runner parses the shared case table shape", () => {
   const cases = parseCasesFromMarkdownTable(`
@@ -30,7 +30,7 @@ test("generic skill eval runner parses the shared case table shape", () => {
   ]);
 });
 
-test("generic skill eval runner builds baseline and skill prompts for any skill", () => {
+test("generic skill eval runner builds prompts without leaking review notes", () => {
   const testCase = {
     id: "GO-01",
     scenario: "Go handler reads legacy JSON field.",
@@ -68,6 +68,9 @@ test("generic skill eval runner builds baseline and skill prompts for any skill"
   assert.match(skill, /Skill 注入文件：\n- skills\/demo-skill\/SKILL\.md/);
   assert.match(skill, /<demo-skill-skill>\n# Demo Skill\n<\/demo-skill-skill>/);
   assert.match(skill, /请返回：\n- 契约\n- 验证/);
+  assert.doesNotMatch(skill, /Provider and consumer JSON contract/);
+  assert.doesNotMatch(skill, /Hide the drift in one handler/);
+  assert.doesNotMatch(skill, /Use parser or adapter boundary/);
 });
 
 test("generic skill eval runner resolves references from a skill-specific tag map", async () => {
@@ -144,7 +147,6 @@ test("generic skill eval runner dry-runs baseline and skill samples without Code
           status,
           injectedFiles,
         }),
-        scoreOutput: () => ({ total: 0 }),
         aggregateSummary: (samples) => ({ count: samples.length }),
         formatAggregateReport: (aggregate) => `count ${aggregate.count}`,
         formatConsoleSummary: (aggregate) => `count ${aggregate.count}`,

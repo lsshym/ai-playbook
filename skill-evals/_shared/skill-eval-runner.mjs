@@ -80,9 +80,6 @@ export function buildSkillEvalPrompt({
     isSkill
       ? [
           `请先使用 ${skillName} skill，再回答这个任务。`,
-          `这条在测什么：${stripMarkdown(testCase.validation)}`,
-          `常见错误：${stripMarkdown(testCase.baselineRisk)}`,
-          "",
           "Skill 注入文件：",
           ...injectedFiles.map((filePath) => `- ${filePath}`),
           "",
@@ -90,8 +87,6 @@ export function buildSkillEvalPrompt({
           `<${skillName}-skill>`,
           skillText.trim(),
           `</${skillName}-skill>`,
-          "",
-          `期待好回答：${stripMarkdown(testCase.skillExpected)}`,
         ].join("\n")
       : "不要使用或提到任何外部 skill。请只按普通 coding 判断回答。",
     "",
@@ -165,7 +160,6 @@ export async function runSkillEval(config, args) {
               mode,
               run,
               status: "existing",
-              score: config.scoreOutput(existing, testCase),
               output: existing,
               injectedFiles,
             }),
@@ -183,7 +177,6 @@ export async function runSkillEval(config, args) {
             mode,
             run,
             status: "completed",
-            score: config.scoreOutput(output, testCase),
             output,
             injectedFiles,
           }),

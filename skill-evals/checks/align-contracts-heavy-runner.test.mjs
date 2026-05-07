@@ -14,16 +14,16 @@ import {
   parseCasesFromReport,
   resolveSkillBundle,
   runHeavySuite,
-} from "../../scripts/align-contracts-heavy-runner.mjs";
+} from "../align-contracts-heavy/runner.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 
-test("align-contracts heavy report exposes the curated core cases", async () => {
-  const report = await readFile(
-    path.join(repoRoot, "docs", "align-contracts-heavy-test", "report.zh-CN.md"),
+test("align-contracts heavy case catalog exposes the curated core cases", async () => {
+  const casesDoc = await readFile(
+    path.join(repoRoot, "skill-evals", "align-contracts-heavy", "cases.zh-CN.md"),
     "utf8",
   );
-  const cases = parseCasesFromReport(report);
+  const cases = parseCasesFromReport(casesDoc);
 
   assert.equal(cases.length, 17);
   assert.deepEqual(cases[0], {
@@ -55,6 +55,17 @@ test("align-contracts heavy report exposes the curated core cases", async () => 
   ]);
 });
 
+test("align-contracts heavy design doc links to the separate case catalog", async () => {
+  const report = await readFile(
+    path.join(repoRoot, "skill-evals", "align-contracts-heavy", "report.zh-CN.md"),
+    "utf8",
+  );
+
+  assert.match(report, /skill-evals\/align-contracts-heavy\/cases\.zh-CN\.md/);
+  assert.doesNotMatch(report, /^\|\s*AC-01\s*\|/m);
+  assert.doesNotMatch(report, /平均总分/);
+});
+
 test("resolveSkillBundle injects React references only for React cases", async () => {
   const reactBundle = await resolveSkillBundle("align-contracts", ["react-typescript"]);
   assert.deepEqual(reactBundle.files.map((file) => file.path), [
@@ -68,7 +79,7 @@ test("resolveSkillBundle injects React references only for React cases", async (
   ]);
 });
 
-test("baseline prompt asks the agent to edit fixture code without leaking rubric hints", () => {
+test("baseline prompt asks the agent to edit fixture code without leaking review notes", () => {
   const prompt = buildPrompt(
     {
       id: "AC-04",
@@ -94,7 +105,7 @@ test("baseline prompt asks the agent to edit fixture code without leaking rubric
   assert.doesNotMatch(prompt, /标记 semantic mismatch/);
 });
 
-test("skill prompt injects skill text but still hides the rubric", () => {
+test("skill prompt injects skill text but still hides review notes", () => {
   const prompt = buildPrompt(
     {
       id: "AC-01",
@@ -134,7 +145,7 @@ test("buildCaseFixture returns real TSX and JSON code for comparison", () => {
   assert.match(fixture.files[1].content, /total_minor_units/);
 });
 
-test("aggregate and console summaries report samples and code snapshots, not scores", () => {
+test("aggregate and console summaries report samples and code snapshots only", () => {
   const aggregate = aggregateSummary([
     {
       测试编号: "AC-01",
@@ -330,7 +341,7 @@ test("formatHtmlReport expands input files if an agent edits them", () => {
   assert.match(html, /ord_999/);
 });
 
-test("dry run writes planned samples without scoring fields", async () => {
+test("dry run writes planned samples without legacy evaluation fields", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "align-contracts-heavy-"));
   await runHeavySuite({
     dryRun: true,
