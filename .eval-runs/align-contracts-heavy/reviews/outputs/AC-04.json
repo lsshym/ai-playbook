@@ -1,0 +1,27 @@
+{
+  "caseId": "AC-04",
+  "verdict": "未通过",
+  "reason": "Skill 在 Run 1 正确识别语义不确定并避免把 status 当 checkoutType，但 Run 2 直接把 consumer 契约改成 status，未真正解决 checkoutType 缺失的契约错位。",
+  "passedAreas": [
+    "Run 1 避免了 checkoutType = status 的错误语义映射",
+    "Run 1 明确标注 API 缺少 checkoutType 且 status 是 payment state",
+    "Skill 没有像 baseline 一样伪造 provider 上不存在的 checkoutType 字段"
+  ],
+  "failedAreas": [
+    "Run 2 删除 CheckoutType 概念并改为 toCheckoutStatus，改变了 consumer 期望的契约而不是修复 provider/consumer 映射",
+    "Run 2 没有保留需要确认 checkoutType 来源或含义的边界",
+    "Run 2 的导出函数语义从 checkout type 变成 checkout status，可能破坏原 UI 调用方"
+  ],
+  "uncertainAreas": [
+    "真实业务中 checkoutType 是否应由另一个 API 字段、schema 或文档提供仍需确认",
+    "Run 1 返回 undefined 后调用方是否已有能力处理缺失 checkoutType 未在快照中体现"
+  ],
+  "evidence": [
+    "Run 1 src/CheckoutBadge.tsx: Skill 将 toCheckoutType 返回类型改为 CheckoutType | undefined，并注释说明 status is payment state, not checkout type",
+    "Run 1 src/CheckoutBadge.tsx: Skill 保留 ApiCheckout 只有 status，没有添加不存在的 checkoutType",
+    "Run 2 src/CheckoutBadge.tsx: Skill 移除 CheckoutType，新增 CheckoutStatus = ApiCheckout[\"status\"]",
+    "Run 2 src/CheckoutBadge.tsx: Skill 将 toCheckoutType(checkout): CheckoutType 改为 toCheckoutStatus(checkout): CheckoutStatus"
+  ],
+  "baselineAssessment": "baseline 通过在 ApiCheckout 上添加 checkoutType 并返回 checkout.checkoutType，看似对齐类型，但实际伪造了 provider contract 中不存在的字段，掩盖了契约错位。",
+  "skillAssessment": "Skill 的 Run 1 符合期待，能识别语义不确定并拒绝猜测映射；但 Run 2 通过重命名和改 consumer 语义绕开问题，未可靠修复原 checkoutType 契约，因此整体未通过。"
+}

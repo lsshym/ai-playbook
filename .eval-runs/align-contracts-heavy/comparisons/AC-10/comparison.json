@@ -1,0 +1,48 @@
+{
+  "caseId": "AC-10",
+  "tags": [
+    "react-typescript"
+  ],
+  "scenario": "表单里分开存 firstName/lastName，提交接口要求 full_name。",
+  "validation": "测回答会不会把 UI 表单状态和 request DTO 的转换放在提交边界。",
+  "baselineRisk": "在 submit handler 里随手拼字符串，规则散落且难测。",
+  "skillExpected": "在 request DTO builder/adapter 中集中生成 full_name，并说明拼接规则。",
+  "runs": [
+    {
+      "run": 1,
+      "files": [
+        {
+          "path": "src/ProfileForm.tsx",
+          "language": "tsx",
+          "role": "editable",
+          "originalPath": "comparisons/AC-10/original/src/ProfileForm.tsx",
+          "baselinePath": "comparisons/AC-10/baseline-1/src/ProfileForm.tsx",
+          "skillPath": "comparisons/AC-10/skill-1/src/ProfileForm.tsx"
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "files": [
+        {
+          "path": "src/ProfileForm.tsx",
+          "language": "tsx",
+          "role": "editable",
+          "originalPath": "comparisons/AC-10/original/src/ProfileForm.tsx",
+          "baselinePath": "comparisons/AC-10/baseline-2/src/ProfileForm.tsx",
+          "skillPath": "comparisons/AC-10/skill-2/src/ProfileForm.tsx"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "src/ProfileForm.tsx",
+      "language": "tsx",
+      "role": "editable",
+      "originalPath": "comparisons/AC-10/original/src/ProfileForm.tsx",
+      "baselinePath": "comparisons/AC-10/baseline-1/src/ProfileForm.tsx",
+      "skillPath": "comparisons/AC-10/skill-1/src/ProfileForm.tsx"
+    }
+  ]
+}

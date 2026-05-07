@@ -1,0 +1,239 @@
+你正在审核 Wingman align-contracts 重型评估结果。
+请像人工 reviewer 一样审核代码语义，而不是做机械匹配。
+不要用正则，不要用关键词命中，不要因为出现某个字段名就判定通过或失败。
+你需要比较 Original、Baseline、Skill 的真实代码改动，判断 Skill 模式是否更好地解决了契约错位。
+
+判定选项只能是：通过、未通过、不确定。
+
+测试编号：AC-01
+场景：后端原来返回 totalCents，现在改成 amount.total_minor_units，前端金额组件还在用旧字段。
+测试目的：测回答能不能看出这是 API 返回结构和 React 组件 props 的契约错位，而不是普通 undefined 小 bug。
+常见错误：在父组件临时构造 { totalCents: amount.total_minor_units }，让旧组件继续假装 API 没变。
+期待好改法：说明 API contract 已变；更新组件 props，或只在 API adapter/mapper 边界统一转成内部字段如 totalMinorUnits。
+
+审核标准：
+- 是否真正修复 provider contract 与 consumer contract 的错位。
+- 是否把转换放在合适边界，而不是在调用点临时凑 shape。
+- 是否避免 fake default、placeholder field 或伪造身份字段。
+- 语义不确定时是否避免猜测，并保留需要确认的边界。
+- 是否只改契约相关代码，避免无关 UI/CSS/业务流程改动。
+- input/provider 样例如果被改动，需要视为风险并解释。
+
+代码快照：
+
+## Run 1
+
+### src/OrderSummary.tsx (editable, tsx)
+
+Original:
+```tsx
+type ApiOrder = {
+  id: string;
+  amount: {
+    total_minor_units: number;
+  };
+};
+
+type MoneyProps = {
+  totalCents: number;
+};
+
+function Money({ totalCents }: MoneyProps) {
+  return <span>{(totalCents / 100).toFixed(2)}</span>;
+}
+
+export function OrderSummary({ order }: { order: ApiOrder }) {
+  return <Money totalCents={order.totalCents} />;
+}
+```
+
+Baseline:
+```tsx
+type ApiOrder = {
+  id: string;
+  amount: {
+    total_minor_units: number;
+  };
+};
+
+type MoneyProps = {
+  totalMinorUnits: number;
+};
+
+function Money({ totalMinorUnits }: MoneyProps) {
+  return <span>{(totalMinorUnits / 100).toFixed(2)}</span>;
+}
+
+export function OrderSummary({ order }: { order: ApiOrder }) {
+  return <Money totalMinorUnits={order.amount.total_minor_units} />;
+}
+```
+
+Skill:
+```tsx
+type ApiOrder = {
+  id: string;
+  amount: {
+    total_minor_units: number;
+  };
+};
+
+type MoneyProps = {
+  amount: ApiOrder["amount"];
+};
+
+function Money({ amount }: MoneyProps) {
+  return <span>{(amount.total_minor_units / 100).toFixed(2)}</span>;
+}
+
+export function OrderSummary({ order }: { order: ApiOrder }) {
+  return <Money amount={order.amount} />;
+}
+```
+
+### fixtures/订单响应.json (input, json)
+
+Original:
+```json
+{
+  "id": "ord_123",
+  "amount": {
+    "total_minor_units": 1299
+  }
+}
+```
+
+Baseline:
+```json
+{
+  "id": "ord_123",
+  "amount": {
+    "total_minor_units": 1299
+  }
+}
+```
+
+Skill:
+```json
+{
+  "id": "ord_123",
+  "amount": {
+    "total_minor_units": 1299
+  }
+}
+```
+
+## Run 2
+
+### src/OrderSummary.tsx (editable, tsx)
+
+Original:
+```tsx
+type ApiOrder = {
+  id: string;
+  amount: {
+    total_minor_units: number;
+  };
+};
+
+type MoneyProps = {
+  totalCents: number;
+};
+
+function Money({ totalCents }: MoneyProps) {
+  return <span>{(totalCents / 100).toFixed(2)}</span>;
+}
+
+export function OrderSummary({ order }: { order: ApiOrder }) {
+  return <Money totalCents={order.totalCents} />;
+}
+```
+
+Baseline:
+```tsx
+type ApiOrder = {
+  id: string;
+  amount: {
+    total_minor_units: number;
+  };
+};
+
+type MoneyProps = {
+  totalMinorUnits: number;
+};
+
+function Money({ totalMinorUnits }: MoneyProps) {
+  return <span>{(totalMinorUnits / 100).toFixed(2)}</span>;
+}
+
+export function OrderSummary({ order }: { order: ApiOrder }) {
+  return <Money totalMinorUnits={order.amount.total_minor_units} />;
+}
+```
+
+Skill:
+```tsx
+type ApiOrder = {
+  id: string;
+  amount: {
+    total_minor_units: number;
+  };
+};
+
+type MoneyProps = {
+  amount: ApiOrder["amount"];
+};
+
+function Money({ amount }: MoneyProps) {
+  return <span>{(amount.total_minor_units / 100).toFixed(2)}</span>;
+}
+
+export function OrderSummary({ order }: { order: ApiOrder }) {
+  return <Money amount={order.amount} />;
+}
+```
+
+### fixtures/订单响应.json (input, json)
+
+Original:
+```json
+{
+  "id": "ord_123",
+  "amount": {
+    "total_minor_units": 1299
+  }
+}
+```
+
+Baseline:
+```json
+{
+  "id": "ord_123",
+  "amount": {
+    "total_minor_units": 1299
+  }
+}
+```
+
+Skill:
+```json
+{
+  "id": "ord_123",
+  "amount": {
+    "total_minor_units": 1299
+  }
+}
+```
+
+请只输出严格 JSON，不要输出 Markdown，不要包裹代码块。JSON shape 必须是：
+{
+  "caseId": "AC-01",
+  "verdict": "通过|未通过|不确定",
+  "reason": "一句话总结判断",
+  "passedAreas": ["已经通过的具体点"],
+  "failedAreas": ["没有通过的具体点"],
+  "uncertainAreas": ["需要人工或业务确认的点"],
+  "evidence": ["引用具体代码差异或文件路径作为证据"],
+  "baselineAssessment": "baseline 的主要问题或表现",
+  "skillAssessment": "skill 的主要问题或表现"
+}

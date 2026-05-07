@@ -1,0 +1,177 @@
+你正在审核 Wingman align-contracts 重型评估结果。
+请像人工 reviewer 一样审核代码语义，而不是做机械匹配。
+不要用正则，不要用关键词命中，不要因为出现某个字段名就判定通过或失败。
+你需要比较 Original、Baseline、Skill 的真实代码改动，判断 Skill 模式是否更好地解决了契约错位。
+
+判定选项只能是：通过、未通过、不确定。
+
+测试编号：AC-05
+场景：API 没有头像字段，但组件类型要求必须传 avatarUrl。
+测试目的：测回答遇到缺字段时，会不会为了过类型检查造假数据。
+常见错误：塞 avatarUrl: ""，让 TypeScript 通过，但掩盖后端其实没给头像。
+期待好改法：把组件契约改成 optional/nullable 并显示空状态，或明确要求 API 补头像字段。
+
+审核标准：
+- 是否真正修复 provider contract 与 consumer contract 的错位。
+- 是否把转换放在合适边界，而不是在调用点临时凑 shape。
+- 是否避免 fake default、placeholder field 或伪造身份字段。
+- 语义不确定时是否避免猜测，并保留需要确认的边界。
+- 是否只改契约相关代码，避免无关 UI/CSS/业务流程改动。
+- input/provider 样例如果被改动，需要视为风险并解释。
+
+代码快照：
+
+## Run 1
+
+### src/UserCard.tsx (editable, tsx)
+
+Original:
+```tsx
+type ApiUser = {
+  name: string;
+};
+
+type UserCardProps = {
+  name: string;
+  avatarUrl: string;
+};
+
+function UserCard({ name, avatarUrl }: UserCardProps) {
+  return <img src={avatarUrl} alt={name} />;
+}
+
+export function UserCardFromApi({ user }: { user: ApiUser }) {
+  return <UserCard name={user.name} avatarUrl={user.avatarUrl} />;
+}
+```
+
+Baseline:
+```tsx
+type ApiUser = {
+  name: string;
+};
+
+type UserCardProps = {
+  name: string;
+  avatarUrl: string;
+};
+
+const DEFAULT_AVATAR_URL = "/default-avatar.png";
+
+function UserCard({ name, avatarUrl }: UserCardProps) {
+  return <img src={avatarUrl} alt={name} />;
+}
+
+export function UserCardFromApi({ user }: { user: ApiUser }) {
+  return <UserCard name={user.name} avatarUrl={DEFAULT_AVATAR_URL} />;
+}
+```
+
+Skill:
+```tsx
+type ApiUser = {
+  name: string;
+};
+
+type UserCardProps = {
+  name: string;
+  avatarUrl?: string;
+};
+
+function UserCard({ name, avatarUrl }: UserCardProps) {
+  if (!avatarUrl) {
+    return <span>{name}</span>;
+  }
+
+  return <img src={avatarUrl} alt={name} />;
+}
+
+export function UserCardFromApi({ user }: { user: ApiUser }) {
+  return <UserCard name={user.name} />;
+}
+```
+
+## Run 2
+
+### src/UserCard.tsx (editable, tsx)
+
+Original:
+```tsx
+type ApiUser = {
+  name: string;
+};
+
+type UserCardProps = {
+  name: string;
+  avatarUrl: string;
+};
+
+function UserCard({ name, avatarUrl }: UserCardProps) {
+  return <img src={avatarUrl} alt={name} />;
+}
+
+export function UserCardFromApi({ user }: { user: ApiUser }) {
+  return <UserCard name={user.name} avatarUrl={user.avatarUrl} />;
+}
+```
+
+Baseline:
+```tsx
+type ApiUser = {
+  name: string;
+};
+
+type UserCardProps = {
+  name: string;
+  avatarUrl?: string;
+};
+
+function UserCard({ name, avatarUrl }: UserCardProps) {
+  if (!avatarUrl) {
+    return <span>{name}</span>;
+  }
+
+  return <img src={avatarUrl} alt={name} />;
+}
+
+export function UserCardFromApi({ user }: { user: ApiUser }) {
+  return <UserCard name={user.name} />;
+}
+```
+
+Skill:
+```tsx
+type ApiUser = {
+  name: string;
+};
+
+type UserCardProps = {
+  name: string;
+  avatarUrl?: string;
+};
+
+function UserCard({ name, avatarUrl }: UserCardProps) {
+  if (!avatarUrl) {
+    return <span aria-label={`${name} has no avatar`}>{name}</span>;
+  }
+
+  return <img src={avatarUrl} alt={name} />;
+}
+
+export function UserCardFromApi({ user }: { user: ApiUser }) {
+  return <UserCard name={user.name} />;
+}
+```
+
+请只输出严格 JSON，不要输出 Markdown，不要包裹代码块。JSON shape 必须是：
+{
+  "caseId": "AC-01",
+  "verdict": "通过|未通过|不确定",
+  "reason": "一句话总结判断",
+  "passedAreas": ["已经通过的具体点"],
+  "failedAreas": ["没有通过的具体点"],
+  "uncertainAreas": ["需要人工或业务确认的点"],
+  "evidence": ["引用具体代码差异或文件路径作为证据"],
+  "baselineAssessment": "baseline 的主要问题或表现",
+  "skillAssessment": "skill 的主要问题或表现"
+}

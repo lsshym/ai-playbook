@@ -1,0 +1,24 @@
+{
+  "caseId": "AC-07",
+  "verdict": "通过",
+  "reason": "Skill 正确认出 priceInCents 是小单位并在展示金额前除以 100，修复了原先把 cents 当主货币单位显示的契约错位，但相对 baseline 没有额外改进。",
+  "passedAreas": [
+    "修复了金额放大 100 倍的问题",
+    "保留 ApiProduct.priceInCents 的 API 契约，没有伪造字段或默认值",
+    "改动范围集中在金额展示逻辑，没有引入无关 UI 或业务流程变化"
+  ],
+  "failedAreas": [
+    "未看到补充金额显示测试",
+    "Skill 与 baseline 完全相同，没有体现更强的边界建模或字段命名改进"
+  ],
+  "uncertainAreas": [
+    "如果项目中存在更上游的 provider/adapter 层，是否应在那里统一转换为主单位需要结合完整代码确认"
+  ],
+  "evidence": [
+    "src/ProductPrice.tsx: Original 使用 product.priceInCents.toFixed(2)，会把 cents 直接显示为 dollars",
+    "src/ProductPrice.tsx: Skill 改为 (product.priceInCents / 100).toFixed(2)",
+    "Run 1 和 Run 2 中 Skill 与 Baseline 代码一致"
+  ],
+  "baselineAssessment": "baseline 正确完成 cents 到主货币单位的显示转换，能修复核心契约错位，但没有补测试或进一步抽象边界。",
+  "skillAssessment": "skill 同样正确修复单位转换问题，语义上通过核心要求；主要不足是没有比 baseline 更进一步，也未提供金额显示测试。"
+}

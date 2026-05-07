@@ -1,0 +1,1 @@
+已修改 [src/ProductPrice.tsx](/var/folders/vl/lc8s4rgd0jjgs6w9sq09624m0000gn/T/wingman-align-clean-workdirs/AC-07/baseline-2/src/ProductPrice.tsx)，将 API 返回的 `priceInCents` 先除以 `100` 再格式化为美元主单位，避免把分直接显示成美元。

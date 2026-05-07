@@ -1,0 +1,48 @@
+{
+  "caseId": "AC-07",
+  "tags": [
+    "react-typescript"
+  ],
+  "scenario": "API 返回 priceInCents，但组件以为拿到的是“元/美元”主单位。",
+  "validation": "测回答能不能发现单位契约错了，不只是字段名不同。",
+  "baselineRisk": "直接显示 API 数字，导致金额放大或缩小 100 倍。",
+  "skillExpected": "明确 cents 是小单位；在固定边界转换或用清晰字段名保持单位，并补金额显示测试。",
+  "runs": [
+    {
+      "run": 1,
+      "files": [
+        {
+          "path": "src/ProductPrice.tsx",
+          "language": "tsx",
+          "role": "editable",
+          "originalPath": "comparisons/AC-07/original/src/ProductPrice.tsx",
+          "baselinePath": "comparisons/AC-07/baseline-1/src/ProductPrice.tsx",
+          "skillPath": "comparisons/AC-07/skill-1/src/ProductPrice.tsx"
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "files": [
+        {
+          "path": "src/ProductPrice.tsx",
+          "language": "tsx",
+          "role": "editable",
+          "originalPath": "comparisons/AC-07/original/src/ProductPrice.tsx",
+          "baselinePath": "comparisons/AC-07/baseline-2/src/ProductPrice.tsx",
+          "skillPath": "comparisons/AC-07/skill-2/src/ProductPrice.tsx"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "src/ProductPrice.tsx",
+      "language": "tsx",
+      "role": "editable",
+      "originalPath": "comparisons/AC-07/original/src/ProductPrice.tsx",
+      "baselinePath": "comparisons/AC-07/baseline-1/src/ProductPrice.tsx",
+      "skillPath": "comparisons/AC-07/skill-1/src/ProductPrice.tsx"
+    }
+  ]
+}

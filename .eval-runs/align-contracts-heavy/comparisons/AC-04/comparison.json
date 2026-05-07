@@ -1,0 +1,48 @@
+{
+  "caseId": "AC-04",
+  "tags": [
+    "react-typescript"
+  ],
+  "scenario": "API 的 status 被拿来填 UI 的 checkoutType，但这两个词可能不是同一个业务概念。",
+  "validation": "测回答会不会警惕“两个字段都像状态”不代表语义相同。",
+  "baselineRisk": "直接写 checkoutType = status，把订单状态、支付状态或结账类型混在一起。",
+  "skillExpected": "标记这是语义不确定的契约错位；先查 schema/docs 或问清楚含义，再决定映射关系。",
+  "runs": [
+    {
+      "run": 1,
+      "files": [
+        {
+          "path": "src/CheckoutBadge.tsx",
+          "language": "tsx",
+          "role": "editable",
+          "originalPath": "comparisons/AC-04/original/src/CheckoutBadge.tsx",
+          "baselinePath": "comparisons/AC-04/baseline-1/src/CheckoutBadge.tsx",
+          "skillPath": "comparisons/AC-04/skill-1/src/CheckoutBadge.tsx"
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "files": [
+        {
+          "path": "src/CheckoutBadge.tsx",
+          "language": "tsx",
+          "role": "editable",
+          "originalPath": "comparisons/AC-04/original/src/CheckoutBadge.tsx",
+          "baselinePath": "comparisons/AC-04/baseline-2/src/CheckoutBadge.tsx",
+          "skillPath": "comparisons/AC-04/skill-2/src/CheckoutBadge.tsx"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "src/CheckoutBadge.tsx",
+      "language": "tsx",
+      "role": "editable",
+      "originalPath": "comparisons/AC-04/original/src/CheckoutBadge.tsx",
+      "baselinePath": "comparisons/AC-04/baseline-1/src/CheckoutBadge.tsx",
+      "skillPath": "comparisons/AC-04/skill-1/src/CheckoutBadge.tsx"
+    }
+  ]
+}

@@ -1,4 +1,2 @@
 .worktrees/
 .DS_Store
-.eval-runs/*
-!.eval-runs/README.md

@@ -1,0 +1,123 @@
+你正在审核 Wingman align-contracts 重型评估结果。
+请像人工 reviewer 一样审核代码语义，而不是做机械匹配。
+不要用正则，不要用关键词命中，不要因为出现某个字段名就判定通过或失败。
+你需要比较 Original、Baseline、Skill 的真实代码改动，判断 Skill 模式是否更好地解决了契约错位。
+
+判定选项只能是：通过、未通过、不确定。
+
+测试编号：AC-17
+场景：任务只要求修契约错位，但代码旁边有 CSS 看起来也想改。
+测试目的：测回答能不能控制改动范围，避免视觉回归。
+常见错误：顺手改 CSS 或布局，导致 UI 变化。
+期待好改法：只改契约相关逻辑和测试，明确保留现有视觉行为。
+
+审核标准：
+- 是否真正修复 provider contract 与 consumer contract 的错位。
+- 是否把转换放在合适边界，而不是在调用点临时凑 shape。
+- 是否避免 fake default、placeholder field 或伪造身份字段。
+- 语义不确定时是否避免猜测，并保留需要确认的边界。
+- 是否只改契约相关代码，避免无关 UI/CSS/业务流程改动。
+- input/provider 样例如果被改动，需要视为风险并解释。
+
+代码快照：
+
+## Run 1
+
+### src/ProfilePanel.tsx (editable, tsx)
+
+Original:
+```tsx
+import "./ProfilePanel.css";
+
+type ApiProfile = {
+  display_name: string;
+};
+
+export function ProfilePanel({ profile }: { profile: ApiProfile }) {
+  return <section className="profile-panel"><h2>{profile.displayName}</h2></section>;
+}
+```
+
+Baseline:
+```tsx
+import "./ProfilePanel.css";
+
+type ApiProfile = {
+  display_name: string;
+};
+
+export function ProfilePanel({ profile }: { profile: ApiProfile }) {
+  return <section className="profile-panel"><h2>{profile.display_name}</h2></section>;
+}
+```
+
+Skill:
+```tsx
+import "./ProfilePanel.css";
+
+type ApiProfile = {
+  display_name: string;
+};
+
+export function ProfilePanel({ profile }: { profile: ApiProfile }) {
+  return <section className="profile-panel"><h2>{profile.display_name}</h2></section>;
+}
+```
+
+## Run 2
+
+### src/ProfilePanel.tsx (editable, tsx)
+
+Original:
+```tsx
+import "./ProfilePanel.css";
+
+type ApiProfile = {
+  display_name: string;
+};
+
+export function ProfilePanel({ profile }: { profile: ApiProfile }) {
+  return <section className="profile-panel"><h2>{profile.displayName}</h2></section>;
+}
+```
+
+Baseline:
+```tsx
+import "./ProfilePanel.css";
+
+type ApiProfile = {
+  display_name: string;
+};
+
+export function ProfilePanel({ profile }: { profile: ApiProfile }) {
+  return <section className="profile-panel"><h2>{profile.display_name}</h2></section>;
+}
+```
+
+Skill:
+```tsx
+import "./ProfilePanel.css";
+
+type ApiProfile = {
+  display_name: string;
+};
+
+export function ProfilePanel({ profile }: { profile: ApiProfile }) {
+  const { display_name: displayName } = profile;
+
+  return <section className="profile-panel"><h2>{displayName}</h2></section>;
+}
+```
+
+请只输出严格 JSON，不要输出 Markdown，不要包裹代码块。JSON shape 必须是：
+{
+  "caseId": "AC-01",
+  "verdict": "通过|未通过|不确定",
+  "reason": "一句话总结判断",
+  "passedAreas": ["已经通过的具体点"],
+  "failedAreas": ["没有通过的具体点"],
+  "uncertainAreas": ["需要人工或业务确认的点"],
+  "evidence": ["引用具体代码差异或文件路径作为证据"],
+  "baselineAssessment": "baseline 的主要问题或表现",
+  "skillAssessment": "skill 的主要问题或表现"
+}
