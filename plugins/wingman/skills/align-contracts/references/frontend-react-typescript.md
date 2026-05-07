@@ -4,7 +4,7 @@ Use this reference after `align-contracts` when binding backend/API data to Reac
 
 ## Frontend Bias
 
-For display-only components, the backend/product API often owns the data meaning. Prefer updating the component interface and internal logic to read the real contract instead of reshaping data in the parent just to satisfy old prop names.
+For display-only components, the backend/product API often owns the data meaning. Prefer updating the component interface and internal logic to read the real contract instead of reshaping data in the parent just to satisfy old prop names, but only when the old and new fields have the same business meaning.
 
 This is not a global ban on adapters. It is a ban on ad-hoc parent/caller mapping that hides component-contract drift.
 
@@ -23,7 +23,7 @@ Before choosing a field strategy, scan for structural or semantic mismatch:
 - Are you reshaping data because the component reads a hardcoded path?
 - Are you renaming semantic fields in the parent, such as `image -> img`, `price -> points`, or `status -> checkoutType`?
 
-If yes, refactor the component contract or ask when source of truth is unclear.
+If yes, refactor the component contract only when semantics are identical. When the consumer term names a distinct business concept that the provider does not expose, keep that consumer concept visible and ask or return an explicit missing state.
 
 ## Field Strategy
 
@@ -63,6 +63,8 @@ API provides `checkout_type`; component expects `crowdfunding.status`.
 ```
 
 Use memory, schema, docs, or user confirmation to decide whether to update the component interface, introduce a boundary adapter, or preserve the existing consumer model.
+
+Do not make the conflict disappear by renaming the consumer API to the provider concept. For example, do not change `toCheckoutType(): CheckoutType` into `toCheckoutStatus(): CheckoutStatus` when `status` is a payment state and `checkoutType` is a checkout kind. Preserve `toCheckoutType` and make the missing provider source explicit.
 
 ## Missing Data
 
