@@ -28,6 +28,7 @@
     "check:plugin": "node scripts/check-plugin.mjs",
     "eval:align-contracts": "node skill-evals/align-contracts-heavy/runner.mjs",
     "eval:align-contracts:dry-run": "node skill-evals/align-contracts-heavy/runner.mjs --dry-run",
+    "eval:align-contracts:review": "node skill-evals/align-contracts-heavy/review.mjs",
     "prepare:codex-local": "bash scripts/sync-to-codex-plugin.sh --dest ."
   },
   "author": "keni",

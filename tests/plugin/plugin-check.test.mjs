@@ -255,6 +255,11 @@ test("package scripts 只暴露本仓库 Codex payload 同步入口", async () =
     packageJson.scripts["prepare:codex-local"],
     "bash scripts/sync-to-codex-plugin.sh --dest .",
   );
+  assert.equal(packageJson.scripts["eval:align-contracts:full"], undefined);
+  assert.equal(
+    packageJson.scripts["eval:align-contracts:review"],
+    "node skill-evals/align-contracts-heavy/review.mjs",
+  );
 });
 
 test("Codex payload 同步脚本必须指向 plugins/wingman 嵌入目录", async () => {

@@ -11,9 +11,11 @@ import {
   formatAggregateReport,
   formatConsoleSummary,
   formatHtmlReport,
+  parseArgs,
   parseCasesFromReport,
   resolveSkillBundle,
   runHeavySuite,
+  selectCasesForRun,
 } from "../align-contracts-heavy/runner.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
@@ -53,6 +55,33 @@ test("align-contracts heavy case catalog exposes the curated core cases", async 
     "AC-16",
     "AC-17",
   ]);
+});
+
+test("align-contracts heavy defaults to a compact smoke case set", async () => {
+  const casesDoc = await readFile(
+    path.join(repoRoot, "skill-evals", "align-contracts-heavy", "cases.zh-CN.md"),
+    "utf8",
+  );
+  const cases = parseCasesFromReport(casesDoc);
+  const selected = selectCasesForRun(cases, {});
+
+  assert.deepEqual(selected.map((testCase) => testCase.id), [
+    "AC-01",
+    "AC-04",
+    "AC-05",
+    "AC-07",
+    "AC-10",
+    "AC-17",
+  ]);
+});
+
+test("align-contracts heavy args default to smoke runs and low reasoning", () => {
+  assert.deepEqual(parseArgs([]), {
+    dryRun: false,
+    reasoningEffort: "low",
+    resume: false,
+    runs: 2,
+  });
 });
 
 test("align-contracts heavy design doc links to the separate case catalog", async () => {
@@ -359,4 +388,26 @@ test("dry run writes planned samples without legacy evaluation fields", async ()
   assert.equal(summary.样本[1].模式, "skill");
   assert.equal(summary.样本[0].评分, undefined);
   assert.equal(summary.样本[0].代码快照, undefined);
+});
+
+test("default dry run plans the compact smoke matrix", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "align-contracts-heavy-smoke-"));
+  await runHeavySuite({
+    dryRun: true,
+    output: root,
+    log: () => {},
+  });
+
+  const summary = JSON.parse(await readFile(path.join(root, "summary.json"), "utf8"));
+  assert.equal(summary.评估规模, "smoke");
+  assert.equal(summary.计划样本数, 24);
+  assert.equal(summary.样本.length, 24);
+  assert.deepEqual([...new Set(summary.样本.map((sample) => sample.测试编号))], [
+    "AC-01",
+    "AC-04",
+    "AC-05",
+    "AC-07",
+    "AC-10",
+    "AC-17",
+  ]);
 });

@@ -2,7 +2,7 @@
 
 import {
   execFileWithInput,
-  parseArgs,
+  parseArgs as parseSharedArgs,
   parseCasesFromMarkdownTable,
   renderCodexConfig,
   resolveSkillBundle as resolveSkillBundleForEval,
@@ -21,7 +21,6 @@ import { fileURLToPath } from "node:url";
 
 export {
   execFileWithInput,
-  parseArgs,
   renderCodexConfig,
 } from "../_shared/skill-eval-runner.mjs";
 
@@ -38,9 +37,21 @@ const skillReferenceMap = {
 };
 const reactTypescriptReferencePath = "skills/align-contracts/references/frontend-react-typescript.md";
 const modes = ["baseline", "skill"];
+const smokeCaseIds = ["AC-01", "AC-04", "AC-05", "AC-07", "AC-10", "AC-17"];
 
 export function parseCasesFromReport(report) {
   return parseCasesFromMarkdownTable(report);
+}
+
+export function selectCasesForRun(cases, args = {}) {
+  if (args.limit != null) {
+    return cases.slice(0, args.limit);
+  }
+
+  const byId = new Map(cases.map((testCase) => [testCase.id, testCase]));
+  return smokeCaseIds
+    .map((caseId) => byId.get(caseId))
+    .filter(Boolean);
 }
 
 export async function resolveSkillBundle(skillName, tags = []) {
@@ -111,19 +122,28 @@ export function buildCaseFixture(testCase) {
   };
 }
 
+export function parseArgs(argv) {
+  const args = parseSharedArgs(argv);
+  if (!argv.includes("--runs")) {
+    args.runs = 2;
+  }
+  return args;
+}
+
 export async function runHeavySuite(args) {
   const log = args.log ?? (() => {});
   const casesDoc = await readFile(casesPath, "utf8");
-  const cases = parseCasesFromReport(casesDoc).slice(0, args.limit ?? undefined);
-  const runs = args.runs ?? 3;
+  const cases = selectCasesForRun(parseCasesFromReport(casesDoc), args);
+  const runs = args.runs ?? 2;
   const resultsRoot = path.resolve(repoRoot, args.output ?? defaultResultsRoot);
+  const reasoningEffort = args.reasoningEffort ?? "low";
 
   log("准备写入测试产物目录。");
   await mkdir(resultsRoot, { recursive: true });
   await writeFile(path.join(resultsRoot, "README.md"), resultsReadme);
 
   if (!args.dryRun) {
-    await prepareCleanCodexHome(args.reasoningEffort ?? "medium");
+    await prepareCleanCodexHome(reasoningEffort);
   }
 
   const summary = [];
@@ -167,7 +187,7 @@ export async function runHeavySuite(args) {
         } else {
           log(`开始：${testCase.id} ${mode} 第 ${run}/${runs} 次，正在调用 Codex。`);
           await prepareSampleWorkdir(workdir, fixture);
-          await runCodex({ prompt, outputPath, workdir, reasoningEffort: args.reasoningEffort ?? "medium" });
+          await runCodex({ prompt, outputPath, workdir, reasoningEffort });
           await copySnapshot({ workdir, snapshotRoot, fixture });
           output = await readFile(outputPath, "utf8");
           log(`完成：${testCase.id} ${mode} 第 ${run}/${runs} 次。`);
@@ -201,7 +221,13 @@ export async function runHeavySuite(args) {
   const aggregate = aggregateSummary(summary);
   await writeFile(
     path.join(resultsRoot, "summary.json"),
-    `${JSON.stringify({ 计划样本数: planned, 汇总: aggregate, 样本: summary }, null, 2)}\n`,
+    `${JSON.stringify({
+      评估规模: args.limit == null ? "smoke" : "custom-limit",
+      推理强度: reasoningEffort,
+      计划样本数: planned,
+      汇总: aggregate,
+      样本: summary,
+    }, null, 2)}\n`,
   );
   await writeFile(
     path.join(resultsRoot, "comparison.json"),
@@ -458,7 +484,11 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples }) {
   });
   return {
     caseId: testCase.id,
+    tags: testCase.tags ?? [],
     scenario: stripMarkdown(testCase.scenario),
+    validation: stripMarkdown(testCase.validation),
+    baselineRisk: stripMarkdown(testCase.baselineRisk),
+    skillExpected: stripMarkdown(testCase.skillExpected),
     runs: runComparisons,
     files: fixture.files.map((file) => {
       const firstRun = runComparisons[0];

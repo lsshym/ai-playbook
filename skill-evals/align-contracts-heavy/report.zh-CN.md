@@ -1,6 +1,6 @@
 # align-contracts 重型代码对比评估
 
-状态：手动审查型评估设计。runner 会生成代码快照和 HTML 对比报告，结论由人工审查给出。
+状态：手动审查型评估设计。runner 会生成代码快照和 HTML 对比报告；`eval:align-contracts:review` 可以再调用 AI 像人工 reviewer 一样给出通过、未通过、不确定的总结。
 
 目标：验证 `skills/align-contracts` 是否真的改善 agent 在“数据提供方”和“数据消费方”之间对齐契约的能力，而不是只检查它是否被提到或触发。
 
@@ -37,13 +37,13 @@
 1. Baseline：普通任务 prompt，不要求使用 `align-contracts`。
 2. Skill：同样任务 prompt，但明确要求先使用 `align-contracts`。
 
-每种模式默认重复 3 次：
+默认只跑 smoke 子集，每种模式重复 2 次：
 
 ```text
-17 个 core 场景 × 2 种模式 × 3 次重复 = 102 份 agent 代码快照
+6 个 smoke 场景 × 2 种模式 × 2 次重复 = 24 份 agent 代码快照
 ```
 
-重复运行的目的不是算分，而是降低单次模型随机性的影响，观察 skill 是否稳定改善真实代码改动。
+17 个 core 场景仍保留在用例清单里作为素材库，但默认不全部运行。重复运行的目的不是算分，而是降低单次模型随机性的影响，观察 skill 是否稳定改善真实代码改动。
 
 ## Prompt 隔离
 
@@ -83,6 +83,17 @@ fixture 文件分两类：
 
 `comparison.json` 是机器可读索引，适合做后续自定义审查工具。多次重复运行时，请优先读取 `cases[].runs[]`；顶层 `cases[].files[]` 只保留第一轮路径，方便快速预览。
 
+也可以运行：
+
+```bash
+npm run eval:align-contracts:review
+```
+
+该命令读取 `comparison.json` 和代码快照，要求 AI 按语义人工审核每个 case，而不是用正则或关键词命中判分。输出文件：
+
+- `review-summary.md`：按通过、未通过、不确定分组的审核总结。
+- `review-summary.json`：结构化审核结果，便于后续分析。
+
 ## 执行产物目录
 
 真实采样输出不放进 `tests/`，统一写入被 git ignore 的运行目录：
@@ -100,6 +111,9 @@ fixture 文件分两类：
 - `summary.json`：样本状态摘要。
 - `summary.md`：简短运行总览。
 - `report.html`：人工审查用三栏代码对比报告。
+- `review-summary.md`：AI 审核后的通过、未通过、不确定总结。
+- `review-summary.json`：AI 审核的结构化结果。
+- `reviews/`：AI 审核 prompt 和输出。
 
 这样仓库里的 `tests/` 只保留稳定测试代码，模型输出不会污染 git 状态。
 
@@ -111,6 +125,7 @@ fixture 文件分两类：
 - 用例表和 `buildAcXXFixture` 仍然分开维护，新增 case 时可能发生文档和 fixture 漂移。
 - `--resume` 只检查输出文件和快照目录是否存在，没有逐个校验每个 fixture 文件是否完整。
 - 如果 Codex 运行失败、超时，或 agent 删除了目标 fixture 文件，runner 目前会中断整轮；后续可以把该样本记为失败并继续跑其他样本。
+- AI 审核依赖模型判断，结论仍建议抽查；它避免正则/关键词判分，但不能替代最终业务判断。
 - 通用 `skill-evals/_shared/skill-eval-runner.mjs` 只负责解析用例、注入 skill 和调用 Codex，不再写入旧版自动评价字段。
 
 ## 当前结论

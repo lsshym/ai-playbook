@@ -109,7 +109,7 @@ export async function runSkillEval(config, args) {
   await writeFile(path.join(resultsRoot, "README.md"), config.resultsReadme ?? defaultResultsReadme(config));
 
   if (!args.dryRun) {
-    await prepareCleanCodexHome(config, args.reasoningEffort ?? "medium");
+    await prepareCleanCodexHome(config, args.reasoningEffort ?? "low");
     await prepareCleanWorkdir(config);
   }
 
@@ -287,7 +287,7 @@ export function execFileWithInput(file, args, options = {}) {
   });
 }
 
-export function renderCodexConfig(workdir, reasoningEffort = "medium") {
+export function renderCodexConfig(workdir, reasoningEffort = "low") {
   return [
     'openai_base_url = "http://ai.wykj.cc:8080"',
     'model = "gpt-5.5"',
@@ -300,7 +300,7 @@ export function renderCodexConfig(workdir, reasoningEffort = "medium") {
 }
 
 export function parseArgs(argv) {
-  const args = { runs: 3, dryRun: false, resume: false };
+  const args = { runs: 3, dryRun: false, resume: false, reasoningEffort: "low" };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--dry-run") {

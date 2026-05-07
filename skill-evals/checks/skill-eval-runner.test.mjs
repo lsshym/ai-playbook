@@ -6,7 +6,9 @@ import test from "node:test";
 
 import {
   buildSkillEvalPrompt,
+  parseArgs,
   parseCasesFromMarkdownTable,
+  renderCodexConfig,
   resolveSkillBundle,
   runSkillEval,
 } from "../_shared/skill-eval-runner.mjs";
@@ -178,6 +180,14 @@ test("generic skill eval runner dry-runs baseline and skill samples without Code
   } finally {
     await rm(fixtureRoot, { recursive: true, force: true });
   }
+});
+
+test("generic skill eval runner defaults Codex reasoning effort to low", () => {
+  const args = parseArgs([]);
+  const config = renderCodexConfig("/tmp/wingman-eval-workdir");
+
+  assert.equal(args.reasoningEffort, "low");
+  assert.match(config, /model_reasoning_effort = "low"/);
 });
 
 async function makeFixtureRepo() {
