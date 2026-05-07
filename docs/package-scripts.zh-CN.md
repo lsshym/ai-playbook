@@ -22,13 +22,13 @@ npm test
 | `test:package` | 用临时 package fixtures 模拟完整插件包，确认缺文件、坏 manifest、坏 frontmatter、路径漂移等问题能被检查脚本抓出来。 |
 | `test:behavior` | 检查行为测试资产是否完整，包括 prompt、expectation 和人工审核记录。它不启动真实 agent，也不验证模型实时行为。 |
 | `check:plugin` | 直接运行 `scripts/check-plugin.mjs`，做一次插件发布健康检查。它也包含在 `test:all` 里。 |
-| `eval:align-contracts` | 手动执行 `skills/align-contracts` 的重型模型评估 runner。默认会按报告里的 17 个 core 场景，baseline/skill 两组各重复 3 次，输出到 `.eval-runs/align-contracts-heavy/`。它不包含在 `npm test` 里。 |
+| `eval:align-contracts` | 手动执行 `skills/align-contracts` 的重型代码对比评估 runner。默认会按报告里的 17 个 core 场景，baseline/skill 两组各重复 3 次，输出 original/baseline/skill 代码快照到 `.eval-runs/align-contracts-heavy/`。它不包含在 `npm test` 里。 |
 | `eval:align-contracts:dry-run` | 只生成重型评估的 prompt、目录说明和 `summary.json`，不调用模型。适合先检查测试用例、隔离方式和输出结构。 |
 | `prepare:codex-local` | 运行 `scripts/sync-to-codex-plugin.sh --dest .`，把根目录维护的 Codex 插件内容同步到 `plugins/wingman/`。这样当前 GitHub 仓库就具备 Codex marketplace 需要的目录结构，用户通过 Codex 从这个仓库安装插件时能找到 Wingman。 |
 
 ## 手动评估脚本
 
-`eval:align-contracts` 是实验评估入口，不是日常单元测试入口。它会调用 Codex 生成真实回答，完整运行是 17 个 core 场景 × 2 个模式 × 3 次重复，也就是 102 份模型输出，所以需要手动触发：
+`eval:align-contracts` 是实验评估入口，不是日常单元测试入口。它会调用 Codex 在最小 fixture 工作区里真实编辑代码，完整运行是 17 个 core 场景 × 2 个模式 × 3 次重复，也就是 102 份代码快照，所以需要手动触发：
 
 ```bash
 npm run eval:align-contracts:dry-run
@@ -39,7 +39,7 @@ npm run eval:align-contracts -- --resume
 
 默认使用 `gpt-5.5` 和 `medium` 推理程度。`--reasoning-effort low|medium|high` 可以覆盖推理程度；`low` 更像压力测试，`medium` 更适合作为默认对比。
 
-评估设计见 `docs/align-contracts-heavy-test/report.zh-CN.md`，运行产物见 `.eval-runs/README.md`。
+评估设计见 `docs/align-contracts-heavy-test/report.zh-CN.md`，运行后重点查看 `.eval-runs/align-contracts-heavy/report.html` 和 `comparison.json`。runner 不做正则自动评分，结果需要人工审查 original / baseline / skill 三栏代码差异。
 
 ## 什么时候跑 `prepare:codex-local`
 

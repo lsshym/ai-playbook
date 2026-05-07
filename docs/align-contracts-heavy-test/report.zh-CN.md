@@ -39,56 +39,30 @@
 每种模式重复 3 次：
 
 ```text
-17 个 core 场景 × 2 种模式 × 3 次重复 = 102 份 agent 输出
+17 个 core 场景 × 2 种模式 × 3 次重复 = 102 份 agent 代码快照
 ```
 
-重复 3 次的目的：降低单次模型随机性的影响，观察 skill 是否稳定改善输出。
+重复 3 次的目的：降低单次模型随机性的影响，观察 skill 是否稳定改善真实代码改动。
 
-## 评分方式
+## 审查方式
 
-每份输出的主分不再按固定 10 个术语打分，而是按当前场景自己的目标来算。这样能避免“回答里提到了 provider contract，所以得分很高，但其实没有解决这个场景”的假阳性。
+runner 不做正则自动评分。每个场景会生成一个最小 fixture，让 baseline 和 skill 两组 agent 在隔离工作区里真实编辑代码。运行后保留三份代码：
 
-主分由两部分组成：
-
-| 主分构成 | 看什么 |
+| 快照 | 人话解释 |
 | --- | --- |
-| 关键期望命中 | 回答有没有做到这个场景明确期待的动作。例如 AC-01 要识别 API contract 已变，并建议更新组件契约或集中转换。 |
-| 高风险错误避开 | 回答有没有避开这个场景最容易犯的错。例如 AC-01 不能在父组件临时拼回 `totalCents`，也不能假装 API 没变。 |
+| original | 测试 fixture 的原始代码。 |
+| baseline | 不注入 `align-contracts` 时，agent 改出来的代码。 |
+| skill | 注入 `align-contracts` 后，agent 改出来的代码。 |
 
-辅助检查清单仍会保留在 `summary.json` 和 `report.html` 里，但它不是主分，只用来解释回答风格：
+人工审查重点：
 
-| 辅助项 | 人话解释 |
-| --- | --- |
-| 实际收到的数据长什么样 | 回答是否说清楚外部数据实际给了哪些字段，比如 API 返回了 `amount.total_minor_units`。 |
-| 使用数据的代码需要什么 | 回答是否说清楚 UI、业务代码或 handler 原本想读取什么字段。 |
-| 应该按谁的定义改 | 回答是否判断 API、schema、domain model、数据库或组件谁才是权威来源。 |
-| 这次错位属于哪种问题 | 回答是否区分字段改名、结构变化、语义不一致、缺字段或来源冲突。 |
-| 应该在哪里修 | 回答是否把修复位置放到 adapter、schema parser、domain model、组件 props 或边界层。 |
-| 避免临时补丁 | 回答是否避免到处写 `oldField = new.field` 这类临时兼容或分散 mapper。 |
-| 语义不确定时先确认 | 回答是否在 `status` 和 `checkoutType` 这类可能不同义的字段上建议查文档或问用户。 |
-| 避免无关改动 | 回答是否强调只修契约错位，不顺手改布局、样式、业务流程或无关结构。 |
+- baseline/skill 是否真正修复 provider 与 consumer 的契约错位。
+- 是否把转换放在合适边界，而不是调用点临时凑 shape。
+- 是否造假字段或默认值，例如 `id: 0`、`avatarUrl: ""`。
+- 语义不确定时是否避免随手 alias，并保留需要确认的边界。
+- 是否只改契约相关代码，避免无关 UI/CSS/业务流程改动。
 
-以下两类旧指标不再作为展示重点：
-
-- “避免假默认值”：已经并入各场景的高风险错误，例如“不能塞 `id: 0`”。
-- “提出验证方式”：prompt 已经要求回答验证方式，区分度不够，保留为内部辅助信号即可。
-
-## 结果判定
-
-每个场景记录：
-
-- Baseline 三次平均分。
-- Skill 三次平均分。
-- Skill 是否比 baseline 稳定改善。
-- Skill 是否出现严重违规，例如造假字段、随手语义映射、破坏公共契约。
-
-建议总体验收线：
-
-- Skill 的主分平均值明显高于 baseline。
-- Skill 的关键期望命中率明显高于 baseline。
-- Skill 的高风险错误避开率明显高于 baseline。
-- Skill 模式下 semantic mismatch 被误当 naming-only 的比例明显下降。
-- Skill 模式下不应为了契约工作引入明显无关改动。
+`comparison.json` 是机器可读索引，`report.html` 是人工三栏对比视图。结论由人工审查给出，不由 runner 自动宣布通过或失败。
 
 ## 测试用例
 
@@ -153,38 +127,30 @@ Please propose the code change approach and mention what you would verify.
 - ...
 
 Baseline Run 1:
-- 摘要：
-- 分数：
-- 违规：
+- 代码快照：
+- 人工备注：
 
 Baseline Run 2:
-- 摘要：
-- 分数：
-- 违规：
+- 代码快照：
+- 人工备注：
 
 Baseline Run 3:
-- 摘要：
-- 分数：
-- 违规：
+- 代码快照：
+- 人工备注：
 
 Skill Run 1:
-- 摘要：
-- 分数：
-- 违规：
+- 代码快照：
+- 人工备注：
 
 Skill Run 2:
-- 摘要：
-- 分数：
-- 违规：
+- 代码快照：
+- 人工备注：
 
 Skill Run 3:
-- 摘要：
-- 分数：
-- 违规：
+- 代码快照：
+- 人工备注：
 
 结论：
-- Baseline 平均分：
-- Skill 平均分：
 - 是否符合预期：
 - 备注：
 ```
@@ -209,7 +175,7 @@ Skill Run 3:
 
 当前文档只定义测试设计和测试用例，不代表 `align-contracts` 已经通过或失败。
 
-下一步如果确认这 17 个 core 场景和评分维度没有问题，再生成可执行 prompt 文件、记录 102 份输出，并把统计结果补回本文档。
+下一步如果确认这 17 个 core 场景和 fixture 覆盖没有问题，再生成代码快照并人工审查 `report.html`。
 
 ## 执行产物目录
 
@@ -222,7 +188,10 @@ Skill Run 3:
 该目录会包含：
 
 - `prompts/`：每个 case、每个模式发送给 Codex 的完整 prompt；重复运行共用同一份 prompt。
-- `outputs/`：每次 Codex 返回的原始文本。
-- `summary.json`：自动评分摘要。
+- `outputs/`：每次 Codex 返回的文字说明。
+- `comparisons/`：每个 case 的 original、baseline、skill 代码快照。
+- `comparison.json`：代码快照索引，方便脚本或人工工具读取。
+- `summary.json`：样本状态摘要，不包含自动评分。
+- `report.html`：三栏代码对比报告。
 
 这样仓库里的 `tests/` 只保留稳定测试代码，102 份模型输出不会污染 git 状态。
