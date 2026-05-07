@@ -8,6 +8,13 @@ For display-only components, the backend/product API often owns the data meaning
 
 This is not a global ban on adapters. It is a ban on ad-hoc parent/caller mapping that hides component-contract drift.
 
+Check component scope before deciding:
+
+- Local page-only components may accept the API-backed shape directly.
+- Shared or reusable components should avoid provider-specific payload types unless the project already treats them as API components.
+- If a component name or usage suggests generic reuse (`Money`, `Avatar`, `UserCard`), prefer stable props such as `totalMinorUnits`, `src`, or optional fields over `ApiOrder["amount"]`.
+- If the component is clearly tied to one provider page (`OrderApiSummary`, `WebhookEventRow`), direct source usage can be clearer.
+
 ## Conflict Check First
 
 Before choosing a field strategy, scan for structural or semantic mismatch:
@@ -35,6 +42,16 @@ For massive, nested, read-only display data, direct source usage can be clearer 
 
 ```tsx
 return <span>Total: {data.transaction_summary.total_net_value_in_usd}</span>;
+```
+
+For small generic display components, do not couple the component to a provider-specific shape just to avoid one prop rename:
+
+```tsx
+// Better for a reusable component.
+return <Money totalMinorUnits={order.amount.total_minor_units} />;
+
+// Risky if Money is shared/generic.
+return <Money amount={order.amount} />;
 ```
 
 ### Semantic Difference
