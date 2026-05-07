@@ -22,25 +22,24 @@ npm test
 | `test:package` | 用临时 package fixtures 模拟完整插件包，确认缺文件、坏 manifest、坏 frontmatter、路径漂移等问题能被检查脚本抓出来。 |
 | `test:behavior` | 检查行为测试资产是否完整，包括 prompt、expectation 和人工审核记录。它不启动真实 agent，也不验证模型实时行为。 |
 | `check:plugin` | 直接运行 `scripts/check-plugin.mjs`，做一次插件发布健康检查。它也包含在 `test:all` 里。 |
-| `eval:align-contracts` | 手动执行 `skills/align-contracts` 的重型代码对比评估 runner。默认只跑 6 个 smoke 场景，baseline/skill 两组各重复 2 次，输出 original/baseline/skill 代码快照到 `.eval-runs/align-contracts-heavy/`。它不包含在 `npm test` 里。 |
-| `eval:align-contracts:dry-run` | 只生成重型评估的 prompt、目录说明和 `summary.json`，不调用模型。适合先检查测试用例、隔离方式和输出结构。 |
-| `eval:align-contracts:review` | 读取 `.eval-runs/align-contracts-heavy/comparison.json` 和代码快照，调用 AI 像人工 reviewer 一样审核每个 case，生成 `review-summary.md` 和 `review-summary.json`。 |
+| `eval:align-contracts` | 手动执行 `skills/align-contracts` 的代码对比评估。默认只跑 6 个 smoke 场景，baseline/skill 两组各重复 2 次，输出 original/baseline/skill 代码快照到 `.eval-runs/align-contracts/`。它不包含在 `npm test` 里。 |
+| `eval:align-contracts:dry-run` | 只生成评估 prompt、目录说明和 `summary.json`，不调用模型。适合先检查测试用例、隔离方式和输出结构。 |
 | `prepare:codex-local` | 运行 `scripts/sync-to-codex-plugin.sh --dest .`，把根目录维护的 Codex 插件内容同步到 `plugins/wingman/`。这样当前 GitHub 仓库就具备 Codex marketplace 需要的目录结构，用户通过 Codex 从这个仓库安装插件时能找到 Wingman。 |
 
 ## 手动评估脚本
 
-`eval:align-contracts` 是实验评估入口，不是日常单元测试入口。它会调用 Codex 在最小 fixture 工作区里真实编辑代码。默认运行 6 个 smoke 场景 × 2 个模式 × 2 次重复，也就是 24 份代码快照：
+`eval:align-contracts` 是实验评估入口，不是日常单元测试入口。它会调用公共 code snapshot runner，让 Codex 在最小 fixture 工作区里真实编辑代码。默认运行 6 个 smoke 场景 × 2 个模式 × 2 次重复，也就是 24 份代码快照：
 
 ```bash
 npm run eval:align-contracts:dry-run
+npm run eval:align-contracts -- --case AC-S05 --runs 1
 npm run eval:align-contracts -- --limit 1 --runs 1
 npm run eval:align-contracts -- --resume
-npm run eval:align-contracts:review
 ```
 
 默认使用 `gpt-5.5` 和 `low` 推理程度。`--reasoning-effort low|medium|high` 可以覆盖推理程度。
 
-评估设计见 `skill-evals/align-contracts-heavy/report.zh-CN.md`，用例清单见 `skill-evals/align-contracts-heavy/cases.zh-CN.md`。运行后可以先查看 `.eval-runs/align-contracts-heavy/report.html` 和 `comparison.json`；需要总结哪些通过、未通过、不确定时，再运行 `npm run eval:align-contracts:review` 让 AI 做语义审核。`review` 不做正则或关键词判分，它会读取代码快照后输出审核结论。
+流程说明见 `skill-evals/align-contracts/README.zh-CN.md`，用例清单见 `skill-evals/align-contracts/cases.zh-CN.md`。运行后主要查看 `.eval-runs/align-contracts/report.html` 和 `comparison.json`；需要 AI 审核总结时，可以把 `report.html` 或 `comparison.json` 交给模型人工判断，后续再抽成公共 review 命令。
 
 ## 什么时候跑 `prepare:codex-local`
 

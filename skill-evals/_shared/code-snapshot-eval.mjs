@@ -1,12 +1,10 @@
-#!/usr/bin/env node
-
 import {
   execFileWithInput,
   parseArgs as parseSharedArgs,
   parseCasesFromMarkdownTable,
   renderCodexConfig,
   resolveSkillBundle as resolveSkillBundleForEval,
-} from "../_shared/skill-eval-runner.mjs";
+} from "./skill-eval-runner.mjs";
 import {
   access,
   cp,
@@ -17,74 +15,108 @@ import {
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 export {
   execFileWithInput,
   renderCodexConfig,
-} from "../_shared/skill-eval-runner.mjs";
+} from "./skill-eval-runner.mjs";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const casesPath = path.join(repoRoot, "skill-evals", "align-contracts-heavy", "cases.zh-CN.md");
-const defaultResultsRoot = path.join(repoRoot, ".eval-runs", "align-contracts-heavy");
-const cleanCodexHome = path.join(os.tmpdir(), "wingman-align-baseline-codex-home");
-const cleanWorkdirRoot = path.join(os.tmpdir(), "wingman-align-clean-workdirs");
+const defaultModes = ["baseline", "skill"];
 
-const skillReferenceMap = {
-  "align-contracts": {
-    "react-typescript": ["references/frontend-react-typescript.md"],
-  },
-};
-const reactTypescriptReferencePath = "skills/align-contracts/references/frontend-react-typescript.md";
-const modes = ["baseline", "skill"];
-const smokeCaseIds = ["AC-01", "AC-04", "AC-05", "AC-07", "AC-10", "AC-17"];
+export function parseCodeSnapshotArgs(argv, { defaultRuns = 2 } = {}) {
+  const sharedArgv = [];
+  const caseIds = [];
 
-export function parseCasesFromReport(report) {
-  return parseCasesFromMarkdownTable(report);
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === "--case") {
+      caseIds.push(argv[index + 1]);
+      index += 1;
+    } else if (arg === "--cases") {
+      caseIds.push(...argv[index + 1].split(",").map((id) => id.trim()).filter(Boolean));
+      index += 1;
+    } else {
+      sharedArgv.push(arg);
+    }
+  }
+
+  const args = parseSharedArgs(sharedArgv);
+  args.caseIds = caseIds;
+
+  if (!argv.includes("--runs")) {
+    args.runs = defaultRuns;
+  }
+  return args;
 }
 
-export function selectCasesForRun(cases, args = {}) {
+export function selectCodeSnapshotCases(cases, args = {}, smokeCaseIds = []) {
+  if (args.caseIds?.length) {
+    const byId = new Map(cases.map((testCase) => [testCase.id, testCase]));
+    return args.caseIds.map((caseId) => {
+      const testCase = byId.get(caseId);
+      if (!testCase) {
+        throw new Error(`未知 case：${caseId}`);
+      }
+      return testCase;
+    });
+  }
+
   if (args.limit != null) {
     return cases.slice(0, args.limit);
   }
 
+  if (!smokeCaseIds.length) {
+    return cases;
+  }
+
   const byId = new Map(cases.map((testCase) => [testCase.id, testCase]));
-  return smokeCaseIds
-    .map((caseId) => byId.get(caseId))
-    .filter(Boolean);
+  return smokeCaseIds.map((caseId) => byId.get(caseId)).filter(Boolean);
 }
 
-export async function resolveSkillBundle(skillName, tags = []) {
+export function resolveCodeSnapshotSkillBundle({
+  repoRoot,
+  skillName,
+  tags = [],
+  referenceMap = {},
+}) {
   return resolveSkillBundleForEval({
     repoRoot,
     skillName,
     tags,
-    referenceMap: skillReferenceMap,
+    referenceMap,
   });
 }
 
-export function buildPrompt(testCase, mode, skillText, injectedFiles = []) {
+export function buildCodeSnapshotEvalPrompt({
+  evalName,
+  skillName,
+  testCase,
+  mode,
+  skillText = "",
+  injectedFiles = [],
+  environment = "现有项目",
+}) {
   const isSkill = mode === "skill";
   return [
-    "你正在执行 Wingman align-contracts skill 的代码改动评估样本。",
+    `你正在执行 ${evalName} 的代码改动评估样本。`,
     "请直接编辑当前工作区里的代码文件，不要只描述思路。",
     "工作区是一个最小 fixture，只包含本测试需要的代码和数据样例。",
     "",
-    `项目环境：${inferEnvironment(testCase)}`,
+    `项目环境：${environment}`,
     `测试编号：${testCase.id}`,
     `场景：${stripMarkdown(testCase.scenario)}`,
     "",
     isSkill
       ? [
-          "请先使用 align-contracts skill，再编辑代码。",
+          `请先使用 ${skillName} skill，再编辑代码。`,
           "",
           "Skill 注入文件：",
           ...injectedFiles.map((filePath) => `- ${filePath}`),
           "",
           "Skill 内容：",
-          "<align-contracts-skill>",
+          `<${skillName}-skill>`,
           skillText.trim(),
-          "</align-contracts-skill>",
+          `</${skillName}-skill>`,
         ].join("\n")
       : "不要使用或提到任何外部 skill。请只按普通 coding 判断编辑代码。",
     "",
@@ -92,58 +124,26 @@ export function buildPrompt(testCase, mode, skillText, injectedFiles = []) {
   ].join("\n");
 }
 
-export function buildCaseFixture(testCase) {
-  const builders = {
-    "AC-01": buildAc01Fixture,
-    "AC-02": buildAc02Fixture,
-    "AC-03": buildAc03Fixture,
-    "AC-04": buildAc04Fixture,
-    "AC-05": buildAc05Fixture,
-    "AC-06": buildAc06Fixture,
-    "AC-07": buildAc07Fixture,
-    "AC-08": buildAc08Fixture,
-    "AC-09": buildAc09Fixture,
-    "AC-10": buildAc10Fixture,
-    "AC-11": buildAc11Fixture,
-    "AC-12": buildAc12Fixture,
-    "AC-13": buildAc13Fixture,
-    "AC-14": buildAc14Fixture,
-    "AC-15": buildAc15Fixture,
-    "AC-16": buildAc16Fixture,
-    "AC-17": buildAc17Fixture,
-  };
-  const build = builders[testCase.id] ?? buildGenericFixture;
-  const fixture = build(testCase);
-  return {
-    files: fixture.files.map((file) => ({
-      ...file,
-      language: file.language ?? languageForPath(file.path),
-    })),
-  };
-}
-
-export function parseArgs(argv) {
-  const args = parseSharedArgs(argv);
-  if (!argv.includes("--runs")) {
-    args.runs = 2;
-  }
-  return args;
-}
-
-export async function runHeavySuite(args) {
+export async function runCodeSnapshotEval(config, args) {
+  const modes = config.modes ?? defaultModes;
   const log = args.log ?? (() => {});
-  const casesDoc = await readFile(casesPath, "utf8");
-  const cases = selectCasesForRun(parseCasesFromReport(casesDoc), args);
-  const runs = args.runs ?? 2;
-  const resultsRoot = path.resolve(repoRoot, args.output ?? defaultResultsRoot);
+  const casesDoc = await readFile(config.casesPath, "utf8");
+  const parsedCases = (config.parseCases ?? parseCasesFromMarkdownTable)(casesDoc);
+  const cases = (config.selectCases ?? selectCodeSnapshotCases)(
+    parsedCases,
+    args,
+    config.smokeCaseIds ?? [],
+  );
+  const runs = args.runs ?? config.defaultRuns ?? 2;
+  const resultsRoot = path.resolve(config.repoRoot, args.output ?? config.defaultResultsRoot);
   const reasoningEffort = args.reasoningEffort ?? "low";
 
   log("准备写入测试产物目录。");
   await mkdir(resultsRoot, { recursive: true });
-  await writeFile(path.join(resultsRoot, "README.md"), resultsReadme);
+  await writeFile(path.join(resultsRoot, "README.md"), config.resultsReadme ?? buildResultsReadme(config));
 
   if (!args.dryRun) {
-    await prepareCleanCodexHome(reasoningEffort);
+    await prepareCodeSnapshotCodexHome(config, reasoningEffort);
   }
 
   const summary = [];
@@ -151,15 +151,23 @@ export async function runHeavySuite(args) {
   let planned = 0;
 
   for (const testCase of cases) {
-    const fixture = buildCaseFixture(testCase);
+    const fixture = normalizeFixture(config.buildFixture(testCase));
     await writeOriginalComparisonFiles({ resultsRoot, testCase, fixture });
 
     for (const mode of modes) {
       const skillBundle = mode === "skill"
-        ? await resolveSkillBundle("align-contracts", testCase.tags)
+        ? await loadSkillBundle(config, testCase.tags)
         : { text: "", files: [] };
       const injectedFiles = skillBundle.files.map((file) => file.path);
-      const prompt = buildPrompt(testCase, mode, skillBundle.text, injectedFiles);
+      const prompt = (config.buildPrompt ?? buildCodeSnapshotEvalPrompt)({
+        evalName: config.evalName,
+        skillName: config.skillName,
+        testCase,
+        mode,
+        skillText: skillBundle.text,
+        injectedFiles,
+        environment: config.inferEnvironment?.(testCase) ?? "现有项目",
+      });
       const promptPath = path.join(resultsRoot, "prompts", testCase.id, `${mode}.txt`);
       await mkdir(path.dirname(promptPath), { recursive: true });
       await writeFile(promptPath, prompt);
@@ -171,11 +179,11 @@ export async function runHeavySuite(args) {
 
         if (args.dryRun) {
           log(`计划：${testCase.id} ${mode} 第 ${run}/${runs} 次。`);
-          summary.push(buildSampleSummary({ testCase, mode, run, status: "planned", injectedFiles }));
+          summary.push(buildCodeSnapshotSampleSummary({ testCase, mode, run, status: "planned", injectedFiles }));
           continue;
         }
 
-        const workdir = sampleWorkdir(testCase.id, mode, run);
+        const workdir = sampleWorkdir(config, testCase.id, mode, run);
         const snapshotRoot = path.join(resultsRoot, "comparisons", testCase.id, `${mode}-${run}`);
         let status = "completed";
         let output = "";
@@ -186,8 +194,8 @@ export async function runHeavySuite(args) {
           status = "existing";
         } else {
           log(`开始：${testCase.id} ${mode} 第 ${run}/${runs} 次，正在调用 Codex。`);
-          await prepareSampleWorkdir(workdir, fixture);
-          await runCodex({ prompt, outputPath, workdir, reasoningEffort });
+          await prepareSampleWorkdir(workdir, fixture, config);
+          await runWritableCodex({ config, prompt, outputPath, workdir, reasoningEffort });
           await copySnapshot({ workdir, snapshotRoot, fixture });
           output = await readFile(outputPath, "utf8");
           log(`完成：${testCase.id} ${mode} 第 ${run}/${runs} 次。`);
@@ -201,7 +209,7 @@ export async function runHeavySuite(args) {
           fixture,
           snapshotRoot,
         });
-        summary.push(buildSampleSummary({
+        summary.push(buildCodeSnapshotSampleSummary({
           testCase,
           mode,
           run,
@@ -209,20 +217,27 @@ export async function runHeavySuite(args) {
           output,
           injectedFiles,
           codeSnapshots: snapshots,
+          sampleExtras: config.buildSampleExtras?.({ testCase, mode, injectedFiles }) ?? {},
         }));
       }
     }
 
-    const caseComparison = buildCaseComparison({ resultsRoot, testCase, fixture, samples: summary });
+    const caseComparison = buildCaseComparison({
+      resultsRoot,
+      testCase,
+      fixture,
+      samples: summary,
+      modes,
+    });
     comparisons.push(caseComparison);
     await writeCaseComparisonJson(resultsRoot, caseComparison);
   }
 
-  const aggregate = aggregateSummary(summary);
+  const aggregate = aggregateCodeSnapshotSummary(summary, modes);
   await writeFile(
     path.join(resultsRoot, "summary.json"),
     `${JSON.stringify({
-      评估规模: args.limit == null ? "smoke" : "custom-limit",
+      评估规模: args.limit == null && !args.caseIds?.length ? "smoke" : "custom",
       推理强度: reasoningEffort,
       计划样本数: planned,
       汇总: aggregate,
@@ -233,22 +248,31 @@ export async function runHeavySuite(args) {
     path.join(resultsRoot, "comparison.json"),
     `${JSON.stringify({ 计划样本数: planned, cases: comparisons }, null, 2)}\n`,
   );
-  const aggregateReport = formatAggregateReport(aggregate);
+  const aggregateReport = formatCodeSnapshotAggregateReport(aggregate, modes);
   await writeFile(path.join(resultsRoot, "summary.md"), `${aggregateReport}\n`);
-  await writeFile(path.join(resultsRoot, "report.html"), formatHtmlReport({ aggregate, planned, samples: summary }));
+  await writeFile(
+    path.join(resultsRoot, "report.html"),
+    formatCodeSnapshotHtmlReport({
+      title: `${config.evalName} 代码对比评估报告`,
+      aggregate,
+      planned,
+      samples: summary,
+      modes,
+    }),
+  );
   log("写入 summary.json 和 comparison.json 完成。");
 
   return {
     planned,
     aggregate,
-    consoleSummary: formatConsoleSummary(aggregate),
+    consoleSummary: formatCodeSnapshotConsoleSummary(aggregate, modes),
     report: aggregateReport,
     samples: summary,
     resultsRoot,
   };
 }
 
-export function aggregateSummary(samples) {
+export function aggregateCodeSnapshotSummary(samples, modes = defaultModes) {
   const aggregate = {
     案例数: new Set(samples.map((sample) => sample.测试编号)).size,
   };
@@ -264,7 +288,7 @@ export function aggregateSummary(samples) {
   return aggregate;
 }
 
-export function formatAggregateReport(aggregate) {
+export function formatCodeSnapshotAggregateReport(aggregate, modes = defaultModes) {
   return [
     "## 总览",
     "",
@@ -279,7 +303,7 @@ export function formatAggregateReport(aggregate) {
   ].join("\n");
 }
 
-export function formatConsoleSummary(aggregate) {
+export function formatCodeSnapshotConsoleSummary(aggregate, modes = defaultModes) {
   return modes
     .map((mode) => {
       const row = aggregate[mode] ?? { 样本数: 0, 已完成: 0, 代码快照数: 0 };
@@ -288,7 +312,13 @@ export function formatConsoleSummary(aggregate) {
     .join("\n");
 }
 
-export function formatHtmlReport({ aggregate, planned, samples }) {
+export function formatCodeSnapshotHtmlReport({
+  title = "代码对比评估报告",
+  aggregate,
+  planned,
+  samples,
+  modes = defaultModes,
+}) {
   const groups = groupSamplesByCase(samples);
   return [
     "<!doctype html>",
@@ -296,7 +326,7 @@ export function formatHtmlReport({ aggregate, planned, samples }) {
     "<head>",
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    "<title>align-contracts 代码对比评估报告</title>",
+    `<title>${escapeHtml(title)}</title>`,
     "<style>",
     "body{margin:0;background:#fafafa;color:#1f2933;font:14px/1.55 -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif}",
     "main{max-width:1440px;margin:0 auto;padding:32px 24px 56px}",
@@ -315,17 +345,17 @@ export function formatHtmlReport({ aggregate, planned, samples }) {
     "</style>",
     "</head>",
     "<body><main>",
-    "<h1>align-contracts 代码对比评估报告</h1>",
-    `<p class="muted">计划样本数 ${planned}。本报告只展示原始 fixture、baseline 改动结果和 skill 改动结果。</p>`,
+    `<h1>${escapeHtml(title)}</h1>`,
+    `<p class="muted">计划样本数 ${planned}。本报告展示原始 fixture、baseline 改动结果和 skill 改动结果。</p>`,
     "<h2>结果总览</h2>",
-    renderModeSummaryTable(aggregate),
+    renderModeSummaryTable(aggregate, modes),
     "<h2>逐 case 代码对比</h2>",
     ...groups.map((group) => renderCaseComparison(group)),
     "</main></body></html>",
   ].join("\n");
 }
 
-function renderModeSummaryTable(aggregate) {
+function renderModeSummaryTable(aggregate, modes) {
   const rows = modes.map((mode) => {
     const row = aggregate[mode] ?? { 样本数: 0, 已完成: 0, 已计划: 0, 代码快照数: 0 };
     return [
@@ -468,20 +498,17 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples }) {
     );
     return {
       run,
-      files: fixture.files.map((file) => {
-        const baseline = byMode.baseline?.代码快照?.find((snapshot) => snapshot.path === file.path);
-        const skill = byMode.skill?.代码快照?.find((snapshot) => snapshot.path === file.path);
-        return {
-          path: file.path,
-          language: file.language,
-          role: file.role ?? "editable",
-          originalPath: relativeTo(resultsRoot, originalSnapshotPath(resultsRoot, testCase.id, file.path)),
-          baselinePath: baseline?.currentPath,
-          skillPath: skill?.currentPath,
-        };
-      }),
+      files: fixture.files.map((file) => ({
+        path: file.path,
+        language: file.language,
+        role: file.role ?? "editable",
+        originalPath: relativeTo(resultsRoot, originalSnapshotPath(resultsRoot, testCase.id, file.path)),
+        baselinePath: byMode.baseline?.代码快照?.find((snapshot) => snapshot.path === file.path)?.currentPath,
+        skillPath: byMode.skill?.代码快照?.find((snapshot) => snapshot.path === file.path)?.currentPath,
+      })),
     };
   });
+
   return {
     caseId: testCase.id,
     tags: testCase.tags ?? [],
@@ -491,8 +518,7 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples }) {
     skillExpected: stripMarkdown(testCase.skillExpected),
     runs: runComparisons,
     files: fixture.files.map((file) => {
-      const firstRun = runComparisons[0];
-      const firstFile = firstRun?.files.find((runFile) => runFile.path === file.path);
+      const firstFile = runComparisons[0]?.files.find((runFile) => runFile.path === file.path);
       return {
         path: file.path,
         language: file.language,
@@ -519,13 +545,13 @@ async function writeOriginalComparisonFiles({ resultsRoot, testCase, fixture }) 
   }
 }
 
-async function prepareSampleWorkdir(workdir, fixture) {
+async function prepareSampleWorkdir(workdir, fixture, config) {
   await rm(workdir, { recursive: true, force: true });
   await mkdir(workdir, { recursive: true });
   await writeFile(
     path.join(workdir, "README.md"),
     [
-      "# Temporary align-contracts eval fixture",
+      `# Temporary ${config.evalName ?? "skill"} eval fixture`,
       "",
       "Edit the code files in this workspace to satisfy the task prompt.",
       "",
@@ -539,18 +565,18 @@ async function prepareSampleWorkdir(workdir, fixture) {
   }
 }
 
-async function runCodex({ prompt, outputPath, workdir, reasoningEffort }) {
-  const env = { ...process.env, CODEX_HOME: cleanCodexHome };
+async function runWritableCodex({ config, prompt, outputPath, workdir, reasoningEffort }) {
+  const env = { ...process.env, CODEX_HOME: config.cleanCodexHome };
   await writeFile(
-    path.join(cleanCodexHome, "config.toml"),
+    path.join(config.cleanCodexHome, "config.toml"),
     renderCodexConfig(workdir, reasoningEffort),
     { mode: 0o600 },
   );
-  await execFileWithInput("codex", buildWritableCodexExecArgs(workdir, outputPath), {
+  await execFileWithInput(config.codexBinary ?? "codex", buildWritableCodexExecArgs(workdir, outputPath), {
     env,
     input: prompt,
-    maxBuffer: 1024 * 1024 * 20,
-    timeout: 1000 * 60 * 8,
+    maxBuffer: config.maxBuffer ?? 1024 * 1024 * 20,
+    timeout: config.timeout ?? 1000 * 60 * 8,
   });
 }
 
@@ -569,13 +595,13 @@ function buildWritableCodexExecArgs(workdir, outputPath) {
   ];
 }
 
-async function prepareCleanCodexHome(reasoningEffort) {
-  await mkdir(cleanCodexHome, { recursive: true, mode: 0o700 });
-  await cp(path.join(os.homedir(), ".codex", "auth.json"), path.join(cleanCodexHome, "auth.json"));
-  await cp(path.join(os.homedir(), ".codex", "installation_id"), path.join(cleanCodexHome, "installation_id"));
+async function prepareCodeSnapshotCodexHome(config, reasoningEffort) {
+  await mkdir(config.cleanCodexHome, { recursive: true, mode: 0o700 });
+  await cp(path.join(os.homedir(), ".codex", "auth.json"), path.join(config.cleanCodexHome, "auth.json"));
+  await cp(path.join(os.homedir(), ".codex", "installation_id"), path.join(config.cleanCodexHome, "installation_id"));
   await writeFile(
-    path.join(cleanCodexHome, "config.toml"),
-    renderCodexConfig(cleanWorkdirRoot, reasoningEffort),
+    path.join(config.cleanCodexHome, "config.toml"),
+    renderCodexConfig(config.cleanWorkdirRoot, reasoningEffort),
     { mode: 0o600 },
   );
 }
@@ -610,11 +636,20 @@ async function collectSnapshots({ resultsRoot, testCase, mode, run, fixture, sna
   return snapshots;
 }
 
-function buildSampleSummary({ testCase, mode, run, status, output = "", injectedFiles = [], codeSnapshots }) {
+function buildCodeSnapshotSampleSummary({
+  testCase,
+  mode,
+  run,
+  status,
+  output = "",
+  injectedFiles = [],
+  codeSnapshots,
+  sampleExtras = {},
+}) {
   const row = {
     测试编号: testCase.id,
     环境标签: testCase.tags ?? [],
-    ReactTS分支: describeReactTsBranch(testCase, mode, injectedFiles),
+    ...sampleExtras,
     场景: stripMarkdown(testCase.scenario),
     主要验证点: stripMarkdown(testCase.validation),
     Baseline风险: stripMarkdown(testCase.baselineRisk),
@@ -634,22 +669,34 @@ function buildSampleSummary({ testCase, mode, run, status, output = "", injected
   return row;
 }
 
-function describeReactTsBranch(testCase, mode, injectedFiles = []) {
-  if (mode !== "skill") return "baseline 不注入 skill。";
-  const needsReactTs = (testCase.tags ?? []).includes("react-typescript");
-  const hasReactTsReference = injectedFiles.includes(reactTypescriptReferencePath);
-  if (needsReactTs && hasReactTsReference) return "已命中 React/TS 参考。";
-  if (needsReactTs) return "未命中 React/TS 参考。";
-  if (hasReactTsReference) return "误注入 React/TS 参考。";
-  return "无需命中 React/TS 参考。";
+function normalizeFixture(fixture) {
+  return {
+    files: fixture.files.map((file) => ({
+      ...file,
+      role: file.role ?? "editable",
+      language: file.language ?? languageForPath(file.path),
+    })),
+  };
+}
+
+function loadSkillBundle(config, tags = []) {
+  if (config.resolveSkillBundle) {
+    return config.resolveSkillBundle(config.skillName, tags);
+  }
+  return resolveCodeSnapshotSkillBundle({
+    repoRoot: config.repoRoot,
+    skillName: config.skillName,
+    tags,
+    referenceMap: config.referenceMap ?? {},
+  });
 }
 
 function originalSnapshotPath(resultsRoot, caseId, filePath) {
   return path.join(resultsRoot, "comparisons", caseId, "original", filePath);
 }
 
-function sampleWorkdir(caseId, mode, run) {
-  return path.join(cleanWorkdirRoot, caseId, `${mode}-${run}`);
+function sampleWorkdir(config, caseId, mode, run) {
+  return path.join(config.cleanWorkdirRoot, caseId, `${mode}-${run}`);
 }
 
 function relativeTo(root, filePath) {
@@ -713,395 +760,20 @@ async function exists(filePath) {
   }
 }
 
-function inferEnvironment(testCase) {
-  const tags = testCase.tags ?? [];
-  if (tags.includes("react-typescript")) return "现有 TypeScript/React 项目";
-  if (tags.includes("db")) return "带数据库/repository 层的 TypeScript 服务";
-  if (tags.includes("webhook")) return "Node.js webhook/event handler 项目";
-  if (tags.includes("sdk")) return "集成外部 SDK 的 TypeScript 服务";
-  if (tags.includes("ai-schema")) return "TypeScript tool/schema 校验项目";
-  if (tags.includes("api")) return "对外或内部 API 契约项目";
-  return "现有项目";
-}
-
-const resultsReadme = [
-  "# align-contracts 代码对比评估输出",
-  "",
-  "这个目录由 `npm run eval:align-contracts` 或 `skill-evals/align-contracts-heavy/runner.mjs` 生成。",
-  "",
-  "## 目录说明",
-  "",
-  "- `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt。",
-  "- `outputs/`: Codex 返回的文字说明，按 case、模式和第几次运行保存。",
-  "- `comparisons/`: original、baseline、skill 的真实代码快照。",
-  "- `comparison.json`: 面向机器读取的代码快照索引。",
-  "- `report.html`: 面向人工审核的三栏代码对比报告。",
-  "- `summary.json`: 样本状态摘要。",
-  "",
-].join("\n");
-
-function buildAc01Fixture() {
-  return {
-    files: [
-      {
-        path: "src/OrderSummary.tsx",
-        language: "tsx",
-        content: tsx(`type ApiOrder = {
-  id: string;
-  amount: {
-    total_minor_units: number;
-  };
-};
-
-type MoneyProps = {
-  totalCents: number;
-};
-
-function Money({ totalCents }: MoneyProps) {
-  return <span>{(totalCents / 100).toFixed(2)}</span>;
-}
-
-export function OrderSummary({ order }: { order: ApiOrder }) {
-  return <Money totalCents={order.totalCents} />;
-}
-`),
-      },
-      {
-        path: "fixtures/订单响应.json",
-        language: "json",
-        role: "input",
-        content: json({
-          id: "ord_123",
-          amount: { total_minor_units: 1299 },
-        }),
-      },
-    ],
-  };
-}
-
-function buildAc02Fixture() {
-  return reactFixture("PriceLabel.tsx", `type ApiProduct = {
-  price: {
-    amount: number;
-    currency: string;
-  };
-};
-
-export function PriceLabel({ product }: { product: ApiProduct }) {
-  return <span>{product.price.amount}</span>;
-}
-`);
-}
-
-function buildAc03Fixture() {
-  return reactFixture("UserName.tsx", `type ApiUser = {
-  user_name: string;
-};
-
-export function UserName({ user }: { user: ApiUser }) {
-  return <span>{user.userName}</span>;
-}
-`);
-}
-
-function buildAc04Fixture() {
-  return reactFixture("CheckoutBadge.tsx", `type ApiCheckout = {
-  status: "paid" | "pending" | "failed";
-};
-
-type CheckoutType = "guest" | "express" | "standard";
-
-export function toCheckoutType(checkout: ApiCheckout): CheckoutType {
-  return checkout.status;
-}
-`);
-}
-
-function buildAc05Fixture() {
-  return reactFixture("UserCard.tsx", `type ApiUser = {
-  name: string;
-};
-
-type UserCardProps = {
-  name: string;
-  avatarUrl: string;
-};
-
-function UserCard({ name, avatarUrl }: UserCardProps) {
-  return <img src={avatarUrl} alt={name} />;
-}
-
-export function UserCardFromApi({ user }: { user: ApiUser }) {
-  return <UserCard name={user.name} avatarUrl={user.avatarUrl} />;
-}
-`);
-}
-
-function buildAc06Fixture() {
-  return reactFixture("ItemList.tsx", `type ApiItem = {
-  name: string;
-};
-
-type Item = {
-  id: string;
-  name: string;
-};
-
-function mapItem(item: ApiItem): Item {
-  return {
-    id: item.id,
-    name: item.name,
-  };
-}
-
-export function ItemList({ items }: { items: ApiItem[] }) {
-  return <ul>{items.map((item) => {
-    const mapped = mapItem(item);
-    return <li key={mapped.id}>{mapped.name}</li>;
-  })}</ul>;
-}
-`);
-}
-
-function buildAc07Fixture() {
-  return reactFixture("ProductPrice.tsx", `type ApiProduct = {
-  priceInCents: number;
-};
-
-export function ProductPrice({ product }: { product: ApiProduct }) {
-  return <span>{"$" + product.priceInCents.toFixed(2)}</span>;
-}
-`);
-}
-
-function buildAc08Fixture() {
-  return reactFixture("SearchResults.tsx", `type Item = { id: string; label: string };
-
-type ApiResponse = {
-  data: Item[];
-  pageInfo: {
-    page: number;
-    hasNextPage: boolean;
-  };
-};
-
-export function SearchResults({ response }: { response: ApiResponse }) {
-  const items = response.items;
-  return <ul>{items.map((item) => <li key={item.id}>{item.label}</li>)}</ul>;
-}
-`);
-}
-
-function buildAc09Fixture() {
-  return reactFixture("Tags.tsx", `type ApiItem = {
-  name: string;
-  tags?: string[];
-};
-
-export function Tags({ item }: { item: ApiItem }) {
-  const tags = item.tags ?? [];
-  return <div>{tags.map((tag) => <span key={tag}>{tag}</span>)}</div>;
-}
-`);
-}
-
-function buildAc10Fixture() {
-  return reactFixture("ProfileForm.tsx", `type FormState = {
-  firstName: string;
-  lastName: string;
-};
-
-type CreateProfileRequest = {
-  full_name: string;
-};
-
-export function handleSubmit(form: FormState, submit: (request: CreateProfileRequest) => void) {
-  submit({
-    firstName: form.firstName,
-    lastName: form.lastName,
-  });
-}
-`);
-}
-
-function buildAc11Fixture() {
-  return reactFixture("SettingsForm.tsx", `type FormState = {
-  name: string;
-  email: string;
-  isDirty: boolean;
-};
-
-export function submitSettings(form: FormState, post: (body: Record<string, unknown>) => void) {
-  post({ ...form });
-}
-`);
-}
-
-function buildAc12Fixture() {
-  return {
-    files: [{
-      path: "src/userRepository.ts",
-      language: "ts",
-      content: ts(`type UserRow = {
-  user_id: string;
-  created_at: string;
-  display_name: string;
-};
-
-type User = {
-  userId: string;
-  createdAt: string;
-  displayName: string;
-};
-
-export function loadUser(row: UserRow): User {
-  return row;
-}
-`),
-    }],
-  };
-}
-
-function buildAc13Fixture() {
-  return {
-    files: [{
-      path: "src/webhook.ts",
-      language: "ts",
-      content: ts(`type WebhookPayload = {
-  type: string;
-  data: unknown;
-};
-
-export function getEventType(payload: WebhookPayload) {
-  return payload.event_type;
-}
-`),
-    }],
-  };
-}
-
-function buildAc14Fixture() {
-  return {
-    files: [{
-      path: "src/sdkAdapter.ts",
-      language: "ts",
-      content: ts(`type CheckoutSession = {
-  amount_total: number;
-};
-
-type Payment = {
-  totalCents: number;
-};
-
-export function toPayment(session: CheckoutSession): Payment {
-  return session;
-}
-`),
-    }],
-  };
-}
-
-function buildAc15Fixture() {
-  return {
-    files: [{
-      path: "src/toolSchema.ts",
-      language: "ts",
-      content: ts(`type ToolArgs = {
-  id: string;
-  action: string;
-};
-
-export function bindToolArgs(output: Partial<ToolArgs>): ToolArgs {
-  return {
-    id: output.id ?? "0",
-    action: output.action ?? "unknown",
-  };
-}
-`),
-    }],
-  };
-}
-
-function buildAc16Fixture() {
-  return {
-    files: [{
-      path: "src/publicApi.ts",
-      language: "ts",
-      content: ts(`type InternalUser = {
-  displayName: string;
-};
-
-export function serializeUser(user: InternalUser) {
-  return {
-    name: user.displayName,
-  };
-}
-`),
-    }],
-  };
-}
-
-function buildAc17Fixture() {
-  return reactFixture("ProfilePanel.tsx", `import "./ProfilePanel.css";
-
-type ApiProfile = {
-  display_name: string;
-};
-
-export function ProfilePanel({ profile }: { profile: ApiProfile }) {
-  return <section className="profile-panel"><h2>{profile.displayName}</h2></section>;
-}
-`);
-}
-
-function buildGenericFixture(testCase) {
-  return {
-    files: [{
-      path: "src/example.ts",
-      language: "ts",
-      content: ts(`export const scenario = ${JSON.stringify(stripMarkdown(testCase.scenario))};
-`),
-    }],
-  };
-}
-
-function reactFixture(fileName, content) {
-  return {
-    files: [{
-      path: `src/${fileName}`,
-      language: "tsx",
-      content: tsx(content),
-    }],
-  };
-}
-
-function ts(value) {
-  return `${value.trim()}\n`;
-}
-
-function tsx(value) {
-  return ts(value);
-}
-
-function json(value) {
-  return `${JSON.stringify(value, null, 2)}\n`;
-}
-
-async function main() {
-  const result = await runHeavySuite({
-    ...parseArgs(process.argv.slice(2)),
-    log: (message) => console.log(message),
-  });
-
-  console.log(`计划样本数：${result.planned}`);
-  console.log(`结果目录：${result.resultsRoot}`);
-  console.log(result.consoleSummary);
-  console.log(`HTML 报告：${path.join(result.resultsRoot, "report.html")}`);
-}
-
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+function buildResultsReadme(config) {
+  return [
+    `# ${config.evalName ?? config.skillName} 代码对比评估输出`,
+    "",
+    "这个目录由通用 code snapshot eval runner 生成。",
+    "",
+    "## 目录说明",
+    "",
+    "- `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt。",
+    "- `outputs/`: Codex 返回的文字说明，按 case、模式和第几次运行保存。",
+    "- `comparisons/`: original、baseline、skill 的真实代码快照。",
+    "- `comparison.json`: 面向机器读取的代码快照索引。",
+    "- `report.html`: 面向人工审核的三栏代码对比报告。",
+    "- `summary.json`: 样本状态摘要。",
+    "",
+  ].join("\n");
 }

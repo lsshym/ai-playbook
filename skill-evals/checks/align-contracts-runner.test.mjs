@@ -14,69 +14,59 @@ import {
   parseArgs,
   parseCasesFromReport,
   resolveSkillBundle,
-  runHeavySuite,
+  runAlignContractsEval,
   selectCasesForRun,
-} from "../align-contracts-heavy/runner.mjs";
+} from "../align-contracts/runner.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 
-test("align-contracts heavy case catalog exposes the curated core cases", async () => {
+test("align-contracts case catalog exposes the curated core cases", async () => {
   const casesDoc = await readFile(
-    path.join(repoRoot, "skill-evals", "align-contracts-heavy", "cases.zh-CN.md"),
+    path.join(repoRoot, "skill-evals", "align-contracts", "cases.zh-CN.md"),
     "utf8",
   );
   const cases = parseCasesFromReport(casesDoc);
 
-  assert.equal(cases.length, 17);
+  assert.equal(cases.length, 6);
   assert.deepEqual(cases[0], {
-    id: "AC-01",
+    id: "AC-S01",
     tags: ["react-typescript"],
-    scenario: "后端原来返回 `totalCents`，现在改成 `amount.total_minor_units`，前端金额组件还在用旧字段。",
-    validation: "测回答能不能看出这是 API 返回结构和 React 组件 props 的契约错位，而不是普通 undefined 小 bug。",
-    baselineRisk: "在父组件临时构造 `{ totalCents: amount.total_minor_units }`，让旧组件继续假装 API 没变。",
-    skillExpected: "说明 API contract 已变；更新组件 props，或只在 API adapter/mapper 边界统一转成内部字段如 `totalMinorUnits`。",
+    scenario: "API 返回 `user_name`，页面里临时定义的 `UserViewModel` 只在当前组件内展示用户名。",
+    validation: "测回答能不能看出局部/临时 consumer type 可以改，不需要为了一个展示字段新增 adapter。",
+    baselineRisk: "为了保留临时 `UserViewModel.userName` 新增 `toUserViewModel()`，把一个局部字段变成不必要架构。",
+    skillExpected: "判断 consumer type 是本地页面展示契约；直接改成本地 alias 或读 `user_name`，不新增 adapter，也不要求后端改字段。",
   });
   assert.deepEqual(cases.map((testCase) => testCase.id), [
-    "AC-01",
-    "AC-02",
-    "AC-03",
-    "AC-04",
-    "AC-05",
-    "AC-06",
-    "AC-07",
-    "AC-08",
-    "AC-09",
-    "AC-10",
-    "AC-11",
-    "AC-12",
-    "AC-13",
-    "AC-14",
-    "AC-15",
-    "AC-16",
-    "AC-17",
+    "AC-S01",
+    "AC-S02",
+    "AC-S03",
+    "AC-S04",
+    "AC-S05",
+    "AC-S06",
   ]);
 });
 
-test("align-contracts heavy defaults to a compact smoke case set", async () => {
+test("align-contracts defaults to a compact smoke case set", async () => {
   const casesDoc = await readFile(
-    path.join(repoRoot, "skill-evals", "align-contracts-heavy", "cases.zh-CN.md"),
+    path.join(repoRoot, "skill-evals", "align-contracts", "cases.zh-CN.md"),
     "utf8",
   );
   const cases = parseCasesFromReport(casesDoc);
   const selected = selectCasesForRun(cases, {});
 
   assert.deepEqual(selected.map((testCase) => testCase.id), [
-    "AC-01",
-    "AC-04",
-    "AC-05",
-    "AC-07",
-    "AC-10",
-    "AC-17",
+    "AC-S01",
+    "AC-S02",
+    "AC-S03",
+    "AC-S04",
+    "AC-S05",
+    "AC-S06",
   ]);
 });
 
-test("align-contracts heavy args default to smoke runs and low reasoning", () => {
+test("align-contracts args default to smoke runs and low reasoning", () => {
   assert.deepEqual(parseArgs([]), {
+    caseIds: [],
     dryRun: false,
     reasoningEffort: "low",
     resume: false,
@@ -84,15 +74,26 @@ test("align-contracts heavy args default to smoke runs and low reasoning", () =>
   });
 });
 
-test("align-contracts heavy design doc links to the separate case catalog", async () => {
-  const report = await readFile(
-    path.join(repoRoot, "skill-evals", "align-contracts-heavy", "report.zh-CN.md"),
+test("align-contracts eval keeps only a short local README, not a long static report", async () => {
+  const readme = await readFile(
+    path.join(repoRoot, "skill-evals", "align-contracts", "README.zh-CN.md"),
     "utf8",
   );
 
-  assert.match(report, /skill-evals\/align-contracts-heavy\/cases\.zh-CN\.md/);
-  assert.doesNotMatch(report, /^\|\s*AC-01\s*\|/m);
-  assert.doesNotMatch(report, /平均总分/);
+  assert.match(readme, /cases\.zh-CN\.md/);
+  assert.match(readme, /report\.html/);
+  assert.doesNotMatch(readme, /## 当前已知限制/);
+  assert.doesNotMatch(readme, /平均总分/);
+});
+
+test("align-contracts args can run a named case without changing the case table", () => {
+  assert.deepEqual(parseArgs(["--case", "AC-S05", "--runs", "1", "--dry-run"]), {
+    caseIds: ["AC-S05"],
+    dryRun: true,
+    reasoningEffort: "low",
+    resume: false,
+    runs: 1,
+  });
 });
 
 test("resolveSkillBundle injects React references only for React cases", async () => {
@@ -111,7 +112,7 @@ test("resolveSkillBundle injects React references only for React cases", async (
 test("baseline prompt asks the agent to edit fixture code without leaking review notes", () => {
   const prompt = buildPrompt(
     {
-      id: "AC-04",
+      id: "AC-S03",
       tags: ["react-typescript"],
       scenario: "API 的 `status` 要接到 UI 的 `checkoutType`。",
       validation: "语义差异识别；不把两个“状态”随手等同。",
@@ -137,12 +138,12 @@ test("baseline prompt asks the agent to edit fixture code without leaking review
 test("skill prompt injects skill text but still hides review notes", () => {
   const prompt = buildPrompt(
     {
-      id: "AC-01",
+      id: "AC-S05",
       tags: ["react-typescript"],
-      scenario: "后端原来返回 `totalCents`，现在改成 `amount.total_minor_units`。",
-      validation: "API -> UI 结构变化。",
-      baselineRisk: "在父组件临时拼回 `totalCents`。",
-      skillExpected: "更新组件契约或集中转换。",
+      scenario: "共享 `Money` 组件直接依赖 `ApiOrder[\"amount\"]`。",
+      validation: "通用组件不能耦合 provider-specific payload。",
+      baselineRisk: "让 `Money` 继续接收 API amount shape。",
+      skillExpected: "改成稳定 props 如 `totalMinorUnits` 和 `currency`。",
     },
     "skill",
     "# Align Contracts\nCore principle: do not preserve a shape.",
@@ -155,35 +156,66 @@ test("skill prompt injects skill text but still hides review notes", () => {
   assert.doesNotMatch(prompt, /这条在测什么/);
   assert.doesNotMatch(prompt, /常见错误/);
   assert.doesNotMatch(prompt, /期待好回答/);
-  assert.doesNotMatch(prompt, /在父组件临时拼回/);
+  assert.doesNotMatch(prompt, /通用组件不能耦合/);
 });
 
-test("buildCaseFixture returns real TSX and JSON code for comparison", () => {
+test("buildCaseFixture returns local consumer type fixture for AC-S01", () => {
   const fixture = buildCaseFixture({
-    id: "AC-01",
+    id: "AC-S01",
     tags: ["react-typescript"],
-    scenario: "后端原来返回 `totalCents`，现在改成 `amount.total_minor_units`。",
+    scenario: "API 返回 `user_name`，页面里临时定义的 `UserViewModel` 只在当前组件内展示用户名。",
   });
 
   assert.deepEqual(fixture.files.map((file) => file.path), [
-    "src/OrderSummary.tsx",
-    "fixtures/订单响应.json",
+    "src/UserHeader.tsx",
   ]);
   assert.equal(fixture.files[0].language, "tsx");
-  assert.match(fixture.files[0].content, /totalCents/);
-  assert.match(fixture.files[1].content, /total_minor_units/);
+  assert.match(fixture.files[0].content, /type UserViewModel/);
+  assert.match(fixture.files[0].content, /user\.userName/);
+});
+
+test("buildCaseFixture returns shared domain boundary fixture for AC-S02", () => {
+  const fixture = buildCaseFixture({
+    id: "AC-S02",
+    tags: ["api", "domain"],
+    scenario: "外部 API 返回 snake_case 用户，但共享 domain `User` 使用 camelCase。",
+  });
+
+  assert.deepEqual(fixture.files.map((file) => file.path), [
+    "src/domain/user.ts",
+    "src/api/users.ts",
+  ]);
+  assert.match(fixture.files[0].content, /export type User/);
+  assert.match(fixture.files[1].content, /return apiUser/);
+});
+
+test("buildCaseFixture returns reusable Money component fixture for AC-S05", () => {
+  const fixture = buildCaseFixture({
+    id: "AC-S05",
+    tags: ["react-typescript"],
+    scenario: "共享 `Money` 组件直接依赖 `ApiOrder[\"amount\"]`。",
+  });
+
+  assert.deepEqual(fixture.files.map((file) => file.path), [
+    "src/apiTypes.ts",
+    "src/components/Money.tsx",
+    "src/pages/OrderSummary.tsx",
+    "src/pages/RefundSummary.tsx",
+  ]);
+  assert.match(fixture.files[1].content, /ApiOrder\["amount"\]/);
+  assert.match(fixture.files[3].content, /<Money amount=\{refund\.amount\}/);
 });
 
 test("aggregate and console summaries report samples and code snapshots only", () => {
   const aggregate = aggregateSummary([
     {
-      测试编号: "AC-01",
+      测试编号: "AC-S05",
       模式: "baseline",
       状态: "已完成",
       代码快照: [{ path: "src/OrderSummary.tsx" }],
     },
     {
-      测试编号: "AC-01",
+      测试编号: "AC-S05",
       模式: "skill",
       状态: "已完成",
       代码快照: [{ path: "src/OrderSummary.tsx" }],
@@ -205,44 +237,44 @@ test("formatHtmlReport renders original, baseline, and skill code columns", () =
     planned: 2,
     samples: [
       {
-        测试编号: "AC-01",
+        测试编号: "AC-S05",
         环境标签: ["react-typescript"],
-        场景: "后端 totalCents 改成 amount.total_minor_units。",
-        主要验证点: "测 API 返回结构和 React props 契约错位。",
-        Baseline风险: "在父组件临时拼回 totalCents。",
-        Skill预期: "更新组件契约或在 adapter 边界统一转换。",
+        场景: "共享 Money 组件直接依赖 ApiOrder amount。",
+        主要验证点: "测通用组件是否避免 provider-specific payload。",
+        Baseline风险: "让 Money 继续接收 API amount shape。",
+        Skill预期: "改成稳定 props，如 totalMinorUnits 和 currency。",
         模式: "baseline",
         第几次运行: 1,
         状态: "已完成",
         代码快照: [
           {
-            path: "src/OrderSummary.tsx",
+            path: "src/components/Money.tsx",
             language: "tsx",
-            originalPath: "comparisons/AC-01/original/src/OrderSummary.tsx",
-            currentPath: "comparisons/AC-01/baseline/src/OrderSummary.tsx",
-            original: "<Money totalCents={order.totalCents} />",
-            current: "<Money totalCents={order.amount.total_minor_units} />",
+            originalPath: "comparisons/AC-S05/original/src/components/Money.tsx",
+            currentPath: "comparisons/AC-S05/baseline/src/components/Money.tsx",
+            original: 'type MoneyProps = { amount: ApiOrder["amount"] }',
+            current: 'type MoneyProps = { amount: ApiOrder["amount"] }',
           },
         ],
       },
       {
-        测试编号: "AC-01",
+        测试编号: "AC-S05",
         环境标签: ["react-typescript"],
-        场景: "后端 totalCents 改成 amount.total_minor_units。",
-        主要验证点: "测 API 返回结构和 React props 契约错位。",
-        Baseline风险: "在父组件临时拼回 totalCents。",
-        Skill预期: "更新组件契约或在 adapter 边界统一转换。",
+        场景: "共享 Money 组件直接依赖 ApiOrder amount。",
+        主要验证点: "测通用组件是否避免 provider-specific payload。",
+        Baseline风险: "让 Money 继续接收 API amount shape。",
+        Skill预期: "改成稳定 props，如 totalMinorUnits 和 currency。",
         模式: "skill",
         第几次运行: 1,
         状态: "已完成",
         代码快照: [
           {
-            path: "src/OrderSummary.tsx",
+            path: "src/components/Money.tsx",
             language: "tsx",
-            originalPath: "comparisons/AC-01/original/src/OrderSummary.tsx",
-            currentPath: "comparisons/AC-01/skill/src/OrderSummary.tsx",
-            original: "<Money totalCents={order.totalCents} />",
-            current: "<Money totalMinorUnits={order.amount.total_minor_units} />",
+            originalPath: "comparisons/AC-S05/original/src/components/Money.tsx",
+            currentPath: "comparisons/AC-S05/skill/src/components/Money.tsx",
+            original: 'type MoneyProps = { amount: ApiOrder["amount"] }',
+            current: "type MoneyProps = { totalMinorUnits: number; currency: string }",
           },
         ],
       },
@@ -251,16 +283,16 @@ test("formatHtmlReport renders original, baseline, and skill code columns", () =
 
   assert.match(html, /Original/);
   assert.match(html, /测试目的/);
-  assert.match(html, /测 API 返回结构和 React props 契约错位/);
+  assert.match(html, /测通用组件是否避免 provider-specific payload/);
   assert.match(html, /常见错误/);
-  assert.match(html, /在父组件临时拼回 totalCents/);
+  assert.match(html, /让 Money 继续接收 API amount shape/);
   assert.match(html, /期待好改法/);
-  assert.match(html, /adapter 边界统一转换/);
+  assert.match(html, /稳定 props/);
   assert.match(html, /Baseline/);
   assert.match(html, /Skill/);
-  assert.match(html, /src\/OrderSummary\.tsx/);
-  assert.match(html, /&lt;Money totalCents=\{order\.totalCents\} \/&gt;/);
-  assert.match(html, /&lt;Money totalMinorUnits=\{order\.amount\.total_minor_units\} \/&gt;/);
+  assert.match(html, /src\/components\/Money\.tsx/);
+  assert.match(html, /ApiOrder/);
+  assert.match(html, /totalMinorUnits/);
   assert.doesNotMatch(html, /PASS/);
   assert.doesNotMatch(html, /FAIL/);
 });
@@ -279,15 +311,15 @@ test("formatHtmlReport renders provider fixture input files once", () => {
     planned: 2,
     samples: [
       {
-        测试编号: "AC-01",
+        测试编号: "AC-S01",
         环境标签: ["react-typescript"],
-        场景: "后端 totalCents 改成 amount.total_minor_units。",
+        场景: "API 返回 user_name，页面临时 UserViewModel 只在当前组件展示用户名。",
         模式: "baseline",
         第几次运行: 1,
         状态: "已完成",
         代码快照: [
           {
-            path: "fixtures/订单响应.json",
+            path: "fixtures/api-user.json",
             language: "json",
             role: "input",
             original: json,
@@ -296,15 +328,15 @@ test("formatHtmlReport renders provider fixture input files once", () => {
         ],
       },
       {
-        测试编号: "AC-01",
+        测试编号: "AC-S01",
         环境标签: ["react-typescript"],
-        场景: "后端 totalCents 改成 amount.total_minor_units。",
+        场景: "API 返回 user_name，页面临时 UserViewModel 只在当前组件展示用户名。",
         模式: "skill",
         第几次运行: 1,
         状态: "已完成",
         代码快照: [
           {
-            path: "fixtures/订单响应.json",
+            path: "fixtures/api-user.json",
             language: "json",
             role: "input",
             original: json,
@@ -315,7 +347,7 @@ test("formatHtmlReport renders provider fixture input files once", () => {
     ],
   });
 
-  assert.match(html, /fixtures\/订单响应\.json/);
+  assert.match(html, /fixtures\/api-user\.json/);
   assert.match(html, /输入材料/);
   assert.doesNotMatch(html, /<div class="code-title">Baseline<\/div>/);
   assert.doesNotMatch(html, /<div class="code-title">Skill<\/div>/);
@@ -329,15 +361,15 @@ test("formatHtmlReport expands input files if an agent edits them", () => {
     planned: 2,
     samples: [
       {
-        测试编号: "AC-01",
+        测试编号: "AC-S01",
         环境标签: ["react-typescript"],
-        场景: "后端 totalCents 改成 amount.total_minor_units。",
+        场景: "API 返回 user_name，页面临时 UserViewModel 只在当前组件展示用户名。",
         模式: "baseline",
         第几次运行: 1,
         状态: "已完成",
         代码快照: [
           {
-            path: "fixtures/订单响应.json",
+            path: "fixtures/api-user.json",
             language: "json",
             role: "input",
             original,
@@ -346,15 +378,15 @@ test("formatHtmlReport expands input files if an agent edits them", () => {
         ],
       },
       {
-        测试编号: "AC-01",
+        测试编号: "AC-S01",
         环境标签: ["react-typescript"],
-        场景: "后端 totalCents 改成 amount.total_minor_units。",
+        场景: "API 返回 user_name，页面临时 UserViewModel 只在当前组件展示用户名。",
         模式: "skill",
         第几次运行: 1,
         状态: "已完成",
         代码快照: [
           {
-            path: "fixtures/订单响应.json",
+            path: "fixtures/api-user.json",
             language: "json",
             role: "input",
             original,
@@ -371,8 +403,8 @@ test("formatHtmlReport expands input files if an agent edits them", () => {
 });
 
 test("dry run writes planned samples without legacy evaluation fields", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "align-contracts-heavy-"));
-  await runHeavySuite({
+  const root = await mkdtemp(path.join(tmpdir(), "align-contracts-"));
+  await runAlignContractsEval({
     dryRun: true,
     limit: 1,
     runs: 1,
@@ -391,8 +423,8 @@ test("dry run writes planned samples without legacy evaluation fields", async ()
 });
 
 test("default dry run plans the compact smoke matrix", async () => {
-  const root = await mkdtemp(path.join(tmpdir(), "align-contracts-heavy-smoke-"));
-  await runHeavySuite({
+  const root = await mkdtemp(path.join(tmpdir(), "align-contracts-smoke-"));
+  await runAlignContractsEval({
     dryRun: true,
     output: root,
     log: () => {},
@@ -403,11 +435,11 @@ test("default dry run plans the compact smoke matrix", async () => {
   assert.equal(summary.计划样本数, 24);
   assert.equal(summary.样本.length, 24);
   assert.deepEqual([...new Set(summary.样本.map((sample) => sample.测试编号))], [
-    "AC-01",
-    "AC-04",
-    "AC-05",
-    "AC-07",
-    "AC-10",
-    "AC-17",
+    "AC-S01",
+    "AC-S02",
+    "AC-S03",
+    "AC-S04",
+    "AC-S05",
+    "AC-S06",
   ]);
 });

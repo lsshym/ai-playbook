@@ -256,9 +256,10 @@ test("package scripts 只暴露本仓库 Codex payload 同步入口", async () =
     "bash scripts/sync-to-codex-plugin.sh --dest .",
   );
   assert.equal(packageJson.scripts["eval:align-contracts:full"], undefined);
+  assert.equal(packageJson.scripts["eval:align-contracts:review"], undefined);
   assert.equal(
-    packageJson.scripts["eval:align-contracts:review"],
-    "node skill-evals/align-contracts-heavy/review.mjs",
+    packageJson.scripts["eval:align-contracts"],
+    "node skill-evals/align-contracts/runner.mjs",
   );
 });
 

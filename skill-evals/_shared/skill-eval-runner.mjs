@@ -13,7 +13,7 @@ import path from "node:path";
 export function parseCasesFromMarkdownTable(report) {
   return report
     .split("\n")
-    .filter((line) => /^\|\s*[A-Z]+-\d{2,}\s*\|/.test(line))
+    .filter((line) => /^\|\s*[A-Z]+-(?:[A-Z]+)?\d{2,}\s*\|/.test(line))
     .map((line) => {
       const cells = line
         .slice(1, -1)
