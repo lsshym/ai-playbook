@@ -45,6 +45,9 @@ test("eval review prompt focuses on cases, criteria, outputs, and snapshots", ()
   assert.match(prompt, /MEM-LOAD-02/);
   assert.match(prompt, /Read index then status-flow only/);
   assert.match(prompt, /依据 memory/);
+  assert.match(prompt, /硬证据/);
+  assert.match(prompt, /弱证据/);
+  assert.match(prompt, /不能把 agent 最终说明当作已经真实读取或未读取某文件的证明/);
   assert.match(prompt, /Original/);
   assert.match(prompt, /Skill/);
 });

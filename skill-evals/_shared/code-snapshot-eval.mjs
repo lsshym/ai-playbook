@@ -9,6 +9,7 @@ import {
   access,
   cp,
   mkdir,
+  readdir,
   readFile,
   rm,
   writeFile,
@@ -200,18 +201,19 @@ export async function runCodeSnapshotEval(config, args) {
           log(`开始：${testCase.id} ${mode} 第 ${run}/${runs} 次，正在调用 Codex。`);
           await prepareSampleWorkdir(workdir, fixture, config);
           await runWritableCodex({ config, prompt, outputPath, workdir, reasoningEffort });
-          await copySnapshot({ workdir, snapshotRoot, fixture });
           output = await readFile(outputPath, "utf8");
           log(`完成：${testCase.id} ${mode} 第 ${run}/${runs} 次。`);
         }
 
-        const snapshots = await collectSnapshots({
+        const snapshots = await captureCodeSnapshots({
+          workdir,
           resultsRoot,
           testCase,
           mode,
           run,
           fixture,
           snapshotRoot,
+          reuseExisting: status === "existing",
         });
         summary.push(buildCodeSnapshotSampleSummary({
           testCase,
@@ -497,9 +499,10 @@ function groupSamplesByCase(samples) {
   return [...groups.values()];
 }
 
-function buildCaseComparison({ resultsRoot, testCase, fixture, samples, modes = defaultModes }) {
+export function buildCaseComparison({ resultsRoot, testCase, fixture, samples, modes = defaultModes }) {
   const caseSamples = samples.filter((sample) => sample.测试编号 === testCase.id);
   const runs = [...new Set(caseSamples.map((sample) => sample.第几次运行))].sort((left, right) => left - right);
+  const files = comparisonFiles({ resultsRoot, testCase, fixture, caseSamples });
   const runComparisons = runs.map((run) => {
     const byMode = Object.fromEntries(
       caseSamples
@@ -508,7 +511,7 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples, modes = 
     );
     return {
       run,
-      files: fixture.files.map((file) => ({
+      files: files.map((file) => ({
         path: file.path,
         language: file.language,
         role: file.role ?? "editable",
@@ -528,7 +531,7 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples, modes = 
     baselineRisk: stripMarkdown(testCase.baselineRisk),
     skillExpected: stripMarkdown(testCase.skillExpected),
     runs: runComparisons,
-    files: fixture.files.map((file) => {
+    files: files.map((file) => {
       const firstFile = runComparisons[0]?.files.find((runFile) => runFile.path === file.path);
       return {
         path: file.path,
@@ -540,6 +543,25 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples, modes = 
       };
     }),
   };
+}
+
+function comparisonFiles({ resultsRoot, testCase, fixture, caseSamples }) {
+  const byPath = new Map(fixture.files.map((file) => [file.path, file]));
+  for (const sample of caseSamples) {
+    for (const snapshot of sample.代码快照 ?? []) {
+      if (!byPath.has(snapshot.path)) {
+        byPath.set(snapshot.path, {
+          path: snapshot.path,
+          language: snapshot.language ?? languageForPath(snapshot.path),
+          role: snapshot.role ?? "editable",
+        });
+      }
+    }
+  }
+  return [...byPath.values()].map((file) => ({
+    ...file,
+    originalPath: relativeTo(resultsRoot, originalSnapshotPath(resultsRoot, testCase.id, file.path)),
+  }));
 }
 
 function buildModePaths(byMode, filePath) {
@@ -643,24 +665,43 @@ async function prepareCodeSnapshotCodexHome(config, reasoningEffort) {
   );
 }
 
-async function copySnapshot({ workdir, snapshotRoot, fixture }) {
-  await rm(snapshotRoot, { recursive: true, force: true });
-  for (const file of fixture.files) {
+export async function captureCodeSnapshots({
+  workdir,
+  resultsRoot,
+  testCase,
+  mode,
+  run,
+  fixture,
+  snapshotRoot,
+  reuseExisting = false,
+}) {
+  if (!reuseExisting) {
+    await rm(snapshotRoot, { recursive: true, force: true });
+  }
+  const files = reuseExisting
+    ? await snapshotFilesFromExistingSnapshot(snapshotRoot, fixture)
+    : await snapshotFiles(workdir, fixture);
+  const snapshots = [];
+
+  for (const file of files) {
+    const originalPath = originalSnapshotPath(resultsRoot, testCase.id, file.path);
     const source = path.join(workdir, file.path);
     const target = path.join(snapshotRoot, file.path);
-    await mkdir(path.dirname(target), { recursive: true });
-    if (await exists(source)) {
-      await cp(source, target);
-    } else {
-      await writeFile(target, missingFileSnapshotContent(file));
-    }
-  }
-}
 
-async function collectSnapshots({ resultsRoot, testCase, mode, run, fixture, snapshotRoot }) {
-  const snapshots = [];
-  for (const file of fixture.files) {
-    const originalPath = originalSnapshotPath(resultsRoot, testCase.id, file.path);
+    if (!(await exists(originalPath))) {
+      await mkdir(path.dirname(originalPath), { recursive: true });
+      await writeFile(originalPath, originalContentForFile(file));
+    }
+
+    if (!reuseExisting) {
+      await mkdir(path.dirname(target), { recursive: true });
+      if (await exists(source)) {
+        await cp(source, target);
+      } else {
+        await writeFile(target, missingFileSnapshotContent(file));
+      }
+    }
+
     const currentPath = path.join(snapshotRoot, file.path);
     snapshots.push({
       path: file.path,
@@ -675,6 +716,58 @@ async function collectSnapshots({ resultsRoot, testCase, mode, run, fixture, sna
     });
   }
   return snapshots;
+}
+
+async function snapshotFilesFromExistingSnapshot(snapshotRoot, fixture) {
+  const byPath = new Map(fixture.files.map((file) => [file.path, file]));
+  for (const filePath of await listWorkspaceFiles(snapshotRoot)) {
+    if (byPath.has(filePath)) continue;
+    byPath.set(filePath, {
+      path: filePath,
+      language: languageForPath(filePath),
+      role: "editable",
+      initiallyExists: false,
+    });
+  }
+  return [...byPath.values()];
+}
+
+async function snapshotFiles(workdir, fixture) {
+  const byPath = new Map(fixture.files.map((file) => [file.path, file]));
+  for (const filePath of await listWorkspaceFiles(workdir)) {
+    if (byPath.has(filePath) || isHarnessFile(filePath)) continue;
+    byPath.set(filePath, {
+      path: filePath,
+      language: languageForPath(filePath),
+      role: "editable",
+      initiallyExists: false,
+    });
+  }
+  return [...byPath.values()];
+}
+
+async function listWorkspaceFiles(root, current = "") {
+  const dir = path.join(root, current);
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+  const files = [];
+  for (const entry of entries) {
+    const relativePath = current ? path.join(current, entry.name) : entry.name;
+    if (entry.isDirectory()) {
+      if (isIgnoredDirectory(entry.name)) continue;
+      files.push(...await listWorkspaceFiles(root, relativePath));
+    } else if (entry.isFile()) {
+      files.push(relativePath.split(path.sep).join("/"));
+    }
+  }
+  return files.sort();
+}
+
+function isHarnessFile(filePath) {
+  return filePath === "README.md" || filePath === "package.json";
+}
+
+function isIgnoredDirectory(name) {
+  return name === ".git" || name === "node_modules";
 }
 
 function originalContentForFile(file) {

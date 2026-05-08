@@ -30,7 +30,7 @@ npm run eval:review -- memory
 
 - `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt。
 - `outputs/`: Codex 的文字输出。
-- `comparisons/`: original 和各运行模式的文件快照。
+- `comparisons/`: original 和各运行模式的文件快照；真实运行时会额外捕获 agent 新建的工作区文件。
 - `comparison.json`: 机器可读的逐 case 快照索引。
 - `summary.json`: 样本状态摘要。
 - `summary.md`: 简短汇总。
@@ -146,6 +146,8 @@ export function buildFixture(testCase) {
 
 `path` 必须是相对路径，不能使用绝对路径或 `..` 跳出 fixture 工作区。
 
+真实运行时，runner 会扫描工作区并把 fixture 未声明的新建文件加入快照和 `comparison.json`，但会忽略 harness 自带的 `README.md`、`package.json`、`.git/` 和 `node_modules/`。新增文件的 original 快照显示为 `[[file does not exist]]`。
+
 ## Prompt 防泄题
 
 统一 runner 只把 `场景` 放进任务 prompt。`重点` 用于报告展示和人工审查，不应原样进入任务 prompt。
@@ -162,6 +164,8 @@ npm run eval:review -- align-contracts
 ```
 
 review 入口读取 `.eval-runs/<eval-name>/summary.json`、`comparison.json`、`outputs/` 和 `comparisons/` 下的快照。它不会读取 HTML 报告，避免浪费 token。
+
+AI 分析报告必须区分证据等级：文件快照、`comparison.json` 和真实读取审计日志是硬证据；agent 最终说明、`Memory files used` 自报和普通输出文字只是弱证据。没有真实读取审计日志时，review 不能把“agent 声明没读 archive/auth/billing”写成“确认没读”。
 
 可以用 `--dry-run` 只生成 `ai-review-prompt.md`，不调用模型；可以用 `--case CASE_ID` 或 `--cases A,B` 限制分析范围。
 

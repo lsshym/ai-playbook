@@ -98,6 +98,9 @@ export function buildEvalReviewPrompt({ evalName, summary, cases, modes = inferM
     modes.includes("baseline") && modes.includes("skill")
       ? "- 对比 baseline 与 skill 的输出和文件快照，判断 skill 是否比 baseline 更符合预期。"
       : "- 按实际运行模式检查输出和文件快照是否符合该 case 的重点。",
+    "- 证据分级：文件快照、comparison.json、summary.json 和真实读取审计日志属于硬证据；agent 最终说明、Memory files used 自报、输出文字只属于弱证据。",
+    "- 不能把 agent 最终说明当作已经真实读取或未读取某文件的证明；没有读取审计日志时，只能说“模型声明读取范围符合/不符合”，不能说“确认未读取”。",
+    "- 如果输出提到的新增或修改文件没有出现在文件快照里，必须标为证据缺口，不能用该文件作为通过依据。",
     "- 每个 case 给出结论：通过 / 部分通过 / 失败 / 无法判断，并写出证据。",
     "- 如果样本只是 dry-run、缺少输出或缺少快照，必须标为无法判断。",
     "- 重点指出 skill 协议问题、fixture 问题、测试标准问题，以及下一步应修的最高优先级事项。",

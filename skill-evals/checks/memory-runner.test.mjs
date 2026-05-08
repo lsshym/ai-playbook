@@ -83,6 +83,8 @@ test("memory prompt injects only the row scenario and hides focus details", () =
   assert.match(prompt, /请先使用 memory-load skill/);
   assert.match(prompt, /场景：checkout 是 folder domain/);
   assert.match(prompt, /请在最终说明中列出本次依据的 memory 文件/);
+  assert.match(prompt, /Memory files used:/);
+  assert.match(prompt, /没有真实读取审计日志时/);
   assert.doesNotMatch(prompt, /先读 checkout\/index\.md/);
   assert.doesNotMatch(prompt, /status-flow\.md；不全量读取/);
 });

@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import {
+  buildCaseComparison,
   buildCodeSnapshotEvalPrompt,
+  captureCodeSnapshots,
   formatCodeSnapshotConsoleSummary,
   formatCodeSnapshotHtmlReport,
   runCodeSnapshotEval,
@@ -97,6 +99,158 @@ test("code snapshot eval dry-run writes prompts, summary, comparison index, and 
     assert.match(html, /这个 case 还没有代码快照/);
   } finally {
     await rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("code snapshot capture includes newly created workspace files", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "code-snapshot-new-files-"));
+  const workdir = path.join(root, "workdir");
+  const resultsRoot = path.join(root, "results");
+  const snapshotRoot = path.join(resultsRoot, "comparisons", "DM-01", "skill-1");
+
+  try {
+    await mkdir(path.join(workdir, "src"), { recursive: true });
+    await mkdir(path.join(resultsRoot, "comparisons", "DM-01", "original", "src"), { recursive: true });
+    await writeFile(path.join(workdir, "README.md"), "harness readme\n");
+    await writeFile(path.join(workdir, "package.json"), "{\"type\":\"module\"}\n");
+    await writeFile(path.join(workdir, "src", "existing.ts"), "export const existing = 2;\n");
+    await writeFile(path.join(workdir, "src", "created.ts"), "export const created = true;\n");
+    await writeFile(
+      path.join(resultsRoot, "comparisons", "DM-01", "original", "src", "existing.ts"),
+      "export const existing = 1;\n",
+    );
+
+    const snapshots = await captureCodeSnapshots({
+      workdir,
+      resultsRoot,
+      testCase: { id: "DM-01" },
+      mode: "skill",
+      run: 1,
+      fixture: {
+        files: [{
+          path: "src/existing.ts",
+          language: "typescript",
+          role: "editable",
+          content: "export const existing = 1;\n",
+        }],
+      },
+      snapshotRoot,
+    });
+
+    assert.deepEqual(snapshots.map((snapshot) => snapshot.path), [
+      "src/existing.ts",
+      "src/created.ts",
+    ]);
+    assert.equal(snapshots.find((snapshot) => snapshot.path === "src/created.ts").original, "[[file does not exist]]\n");
+    assert.match(
+      await readFile(path.join(snapshotRoot, "src", "created.ts"), "utf8"),
+      /created = true/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("case comparison includes files created outside the declared fixture", () => {
+  const comparison = buildCaseComparison({
+    resultsRoot: "/tmp/results",
+    testCase: {
+      id: "DM-01",
+      tags: ["typescript"],
+      scenario: "Create a helper.",
+      validation: "New helper must be visible in review.",
+    },
+    fixture: {
+      files: [{
+        path: "src/existing.ts",
+        language: "typescript",
+        role: "editable",
+      }],
+    },
+    modes: ["skill"],
+    samples: [{
+      测试编号: "DM-01",
+      模式: "skill",
+      第几次运行: 1,
+      代码快照: [
+        {
+          path: "src/existing.ts",
+          language: "typescript",
+          role: "editable",
+          currentPath: "comparisons/DM-01/skill-1/src/existing.ts",
+        },
+        {
+          path: "src/created.ts",
+          language: "typescript",
+          role: "editable",
+          currentPath: "comparisons/DM-01/skill-1/src/created.ts",
+        },
+      ],
+    }],
+  });
+
+  assert.deepEqual(comparison.runs[0].files.map((file) => file.path), [
+    "src/existing.ts",
+    "src/created.ts",
+  ]);
+  assert.deepEqual(comparison.files.map((file) => file.path), [
+    "src/existing.ts",
+    "src/created.ts",
+  ]);
+  assert.equal(comparison.files.find((file) => file.path === "src/created.ts").role, "editable");
+  assert.equal(
+    comparison.files.find((file) => file.path === "src/created.ts").modePaths.skill,
+    "comparisons/DM-01/skill-1/src/created.ts",
+  );
+});
+
+test("code snapshot collect can reuse existing snapshots without a workdir", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "code-snapshot-existing-"));
+  const resultsRoot = path.join(root, "results");
+  const snapshotRoot = path.join(resultsRoot, "comparisons", "DM-01", "skill-1");
+
+  try {
+    await mkdir(path.join(resultsRoot, "comparisons", "DM-01", "original", "src"), { recursive: true });
+    await mkdir(path.join(snapshotRoot, "src"), { recursive: true });
+    await writeFile(
+      path.join(resultsRoot, "comparisons", "DM-01", "original", "src", "existing.ts"),
+      "export const existing = 1;\n",
+    );
+    await writeFile(path.join(snapshotRoot, "src", "existing.ts"), "export const existing = 2;\n");
+    await writeFile(path.join(snapshotRoot, "src", "created.ts"), "export const created = true;\n");
+
+    const snapshots = await captureCodeSnapshots({
+      workdir: path.join(root, "missing-workdir"),
+      resultsRoot,
+      testCase: { id: "DM-01" },
+      mode: "skill",
+      run: 1,
+      fixture: {
+        files: [{
+          path: "src/existing.ts",
+          language: "typescript",
+          role: "editable",
+          content: "export const existing = 1;\n",
+        }],
+      },
+      snapshotRoot,
+      reuseExisting: true,
+    });
+
+    assert.deepEqual(snapshots.map((snapshot) => snapshot.path), [
+      "src/existing.ts",
+      "src/created.ts",
+    ]);
+    assert.match(
+      snapshots.find((snapshot) => snapshot.path === "src/existing.ts").current,
+      /existing = 2/,
+    );
+    assert.match(
+      snapshots.find((snapshot) => snapshot.path === "src/created.ts").current,
+      /created = true/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
