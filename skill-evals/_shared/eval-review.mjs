@@ -7,7 +7,11 @@ import { access, cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-const modes = ["baseline", "skill"];
+const defaultModes = ["baseline", "skill"];
+const labeledModes = {
+  baseline: "Baseline",
+  skill: "Skill",
+};
 
 export function parseEvalReviewArgs(argv) {
   const args = {};
@@ -83,13 +87,17 @@ export async function runEvalReview({
   return { status: "completed", resultsRoot, promptPath, outputPath };
 }
 
-export function buildEvalReviewPrompt({ evalName, summary, cases }) {
+export function buildEvalReviewPrompt({ evalName, summary, cases, modes = inferModesFromSummary(summary) }) {
   return [
     `请生成一份中文 AI 评估分析报告，评估对象是 Wingman skill eval：${evalName}。`,
     "",
+    `本次结果模式：${modes.join(", ")}`,
+    "",
     "评估方式：",
     "- 逐 case 使用“重点/validation”作为判分标准，不要只评价代码风格。",
-    "- 对比 baseline 与 skill 的输出和文件快照，判断 skill 是否比 baseline 更符合预期。",
+    modes.includes("baseline") && modes.includes("skill")
+      ? "- 对比 baseline 与 skill 的输出和文件快照，判断 skill 是否比 baseline 更符合预期。"
+      : "- 按实际运行模式检查输出和文件快照是否符合该 case 的重点。",
     "- 每个 case 给出结论：通过 / 部分通过 / 失败 / 无法判断，并写出证据。",
     "- 如果样本只是 dry-run、缺少输出或缺少快照，必须标为无法判断。",
     "- 重点指出 skill 协议问题、fixture 问题、测试标准问题，以及下一步应修的最高优先级事项。",
@@ -104,13 +112,14 @@ export function buildEvalReviewPrompt({ evalName, summary, cases }) {
     fencedJson(summary),
     "",
     "## Case 数据",
-    ...cases.map(renderReviewCase),
+    ...cases.map((testCase) => renderReviewCase(testCase, modes)),
   ].join("\n");
 }
 
 async function loadEvalReviewInput({ resultsRoot, caseIds = [], maxFileChars, maxOutputChars }) {
   const summary = summarizeEvalSummary(await readJson(path.join(resultsRoot, "summary.json")));
   const comparison = await readJson(path.join(resultsRoot, "comparison.json"));
+  const modes = comparison.modes ?? inferModesFromSummary(summary);
   const selected = selectCases(comparison.cases ?? [], caseIds);
   const cases = [];
 
@@ -122,16 +131,17 @@ async function loadEvalReviewInput({ resultsRoot, caseIds = [], maxFileChars, ma
       validation: testCase.validation ?? "",
       runs: await Promise.all((testCase.runs ?? []).map(async (run) => ({
         run: run.run,
-        outputs: await readRunOutputs(resultsRoot, testCase.caseId, run.run, maxOutputChars),
-        files: await Promise.all((run.files ?? []).map((file) => readReviewFile(resultsRoot, file, maxFileChars))),
+        modes,
+        outputs: await readRunOutputs(resultsRoot, testCase.caseId, run.run, modes, maxOutputChars),
+        files: await Promise.all((run.files ?? []).map((file) => readReviewFile(resultsRoot, file, modes, maxFileChars))),
       }))),
     });
   }
 
-  return { summary, cases };
+  return { summary, cases, modes };
 }
 
-async function readRunOutputs(resultsRoot, caseId, run, maxOutputChars) {
+async function readRunOutputs(resultsRoot, caseId, run, modes, maxOutputChars) {
   const entries = {};
   for (const mode of modes) {
     const outputPath = path.join(resultsRoot, "outputs", caseId, `${mode}-${run}.md`);
@@ -140,15 +150,27 @@ async function readRunOutputs(resultsRoot, caseId, run, maxOutputChars) {
   return entries;
 }
 
-async function readReviewFile(resultsRoot, file, maxFileChars) {
+async function readReviewFile(resultsRoot, file, modes, maxFileChars) {
   return {
     path: file.path,
     language: file.language,
     role: file.role ?? "editable",
     original: await readRelativeSnapshot(resultsRoot, file.originalPath, maxFileChars),
-    baseline: await readRelativeSnapshot(resultsRoot, file.baselinePath, maxFileChars),
-    skill: await readRelativeSnapshot(resultsRoot, file.skillPath, maxFileChars),
+    snapshots: await readModeSnapshots(resultsRoot, file, modes, maxFileChars),
   };
+}
+
+async function readModeSnapshots(resultsRoot, file, modes, maxFileChars) {
+  const snapshots = {};
+  for (const mode of modes) {
+    const legacyPath = mode === "baseline" ? file.baselinePath : mode === "skill" ? file.skillPath : undefined;
+    snapshots[mode] = await readRelativeSnapshot(
+      resultsRoot,
+      file.modePaths?.[mode] ?? legacyPath,
+      maxFileChars,
+    );
+  }
+  return snapshots;
 }
 
 async function readRelativeSnapshot(resultsRoot, relativePath, maxChars) {
@@ -173,7 +195,7 @@ function selectCases(cases, caseIds) {
   });
 }
 
-function renderReviewCase(testCase) {
+function renderReviewCase(testCase, modes) {
   return [
     `### ${testCase.caseId}`,
     "",
@@ -181,37 +203,37 @@ function renderReviewCase(testCase) {
     `场景：${testCase.scenario}`,
     `重点：${testCase.validation || "未提供"}`,
     "",
-    ...testCase.runs.map(renderReviewRun),
+    ...testCase.runs.map((run) => renderReviewRun(run, modes)),
   ].join("\n");
 }
 
-function renderReviewRun(run) {
+function renderReviewRun(run, fallbackModes) {
+  const modes = run.modes ?? fallbackModes;
   return [
     `#### Run ${run.run}`,
     "",
-    "Baseline 输出：",
-    fenced("markdown", run.outputs.baseline || "[[output missing]]\n"),
+    ...modes.flatMap((mode) => [
+      `${modeLabel(mode)} 输出：`,
+      fenced("markdown", run.outputs[mode] || "[[output missing]]\n"),
+      "",
+    ]),
     "",
-    "Skill 输出：",
-    fenced("markdown", run.outputs.skill || "[[output missing]]\n"),
-    "",
-    ...run.files.map(renderReviewFile),
+    ...run.files.map((file) => renderReviewFile(file, modes)),
   ].join("\n");
 }
 
-function renderReviewFile(file) {
+function renderReviewFile(file, modes) {
   return [
     `文件：${file.path} (${file.role}, ${file.language ?? "text"})`,
     "",
     "Original:",
     fenced(file.language, file.original),
     "",
-    "Baseline:",
-    fenced(file.language, file.baseline),
-    "",
-    "Skill:",
-    fenced(file.language, file.skill),
-    "",
+    ...modes.flatMap((mode) => [
+      `${modeLabel(mode)}:`,
+      fenced(file.language, file.snapshots?.[mode] ?? file[mode] ?? "[[snapshot missing]]\n"),
+      "",
+    ]),
   ].join("\n");
 }
 
@@ -223,6 +245,16 @@ function summarizeEvalSummary(summary) {
     }
   }
   return compact;
+}
+
+function inferModesFromSummary(summary) {
+  const aggregate = summary?.汇总 ?? {};
+  const modes = Object.keys(aggregate).filter((key) => key !== "案例数");
+  return modes.length ? modes : defaultModes;
+}
+
+function modeLabel(mode) {
+  return labeledModes[mode] ?? mode;
 }
 
 function fencedJson(value) {

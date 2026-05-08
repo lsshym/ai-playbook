@@ -56,6 +56,7 @@ test("memory defaults to all curated smoke cases", async () => {
 });
 
 test("memory args default to one dry-run capable smoke matrix", () => {
+  assert.deepEqual(definition.config.modes, ["skill"]);
   assert.deepEqual(definition.parseArgs([]), {
     caseIds: [],
     dryRun: false,
@@ -143,10 +144,14 @@ test("memory dry run writes prompts, summary, and comparison index", async () =>
   const comparison = JSON.parse(await readFile(path.join(root, "comparison.json"), "utf8"));
   const prompt = await readFile(path.join(root, "prompts", "MEM-SETUP-01", "skill.txt"), "utf8");
 
-  assert.equal(summary.计划样本数, 2);
-  assert.equal(summary.样本.length, 2);
-  assert.deepEqual(summary.样本.map((sample) => sample.模式), ["baseline", "skill"]);
+  assert.equal(summary.计划样本数, 1);
+  assert.equal(summary.样本.length, 1);
+  assert.deepEqual(summary.样本.map((sample) => sample.模式), ["skill"]);
+  assert.deepEqual(Object.keys(summary.汇总).sort(), ["skill", "案例数"].sort());
   assert.equal(comparison.cases[0].caseId, "MEM-SETUP-01");
+  assert.equal(comparison.cases[0].runs[0].files[0].baselinePath, undefined);
+  assert.equal(comparison.cases[0].runs[0].files[0].skillPath, undefined);
+  assert.deepEqual(comparison.cases[0].runs[0].files[0].modePaths, {});
   assert.match(comparison.cases[0].files[0].originalPath, /comparisons\/MEM-SETUP-01\/original\/\.wingman\/memory\/projectBrief\.md/);
   assert.match(prompt, /# Memory Setup/);
 });

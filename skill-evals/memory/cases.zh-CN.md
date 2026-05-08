@@ -2,7 +2,7 @@
 
 本文只维护 `memory-setup`、`memory-load`、`memory-sync` 三个 memory skill 的评估用例清单。运行流程和 runner 以后补充到 `README.zh-CN.md`。
 
-runner 应从下表解析用例 ID、目标 skill、环境标签、场景和重点。`场景` 可以进入任务 prompt；`重点` 主要用于报告展示、人工审查和未来自动断言，不应原样泄露到 baseline/skill 的任务 prompt。
+runner 应从下表解析用例 ID、目标 skill、环境标签、场景和重点。`场景` 可以进入任务 prompt；`重点` 主要用于报告展示、人工审查和未来自动断言，不应原样泄露到任务 prompt。
 
 ## Smoke 用例
 
@@ -28,7 +28,7 @@ memory eval 的 fixture 应包含两类文件：
 
 | 角色 | 含义 | 报告展示方式 |
 | --- | --- | --- |
-| `editable` | agent 应该编辑或创建的代码、memory 或平台入口文件。 | 展示 Original / Baseline / Skill 三栏；新建文件的 Original 可显示为空或“文件不存在”。 |
-| `input` | 用来诱导或约束判断的只读材料，例如旧 archive 诱饵、无关 domain、外部 API 样例。 | 如果未被修改，只展示一次；如果被修改，展开三栏并提示检查。 |
+| `editable` | agent 应该编辑或创建的代码、memory 或平台入口文件。 | 按当前 `modes` 展示 Original 和运行模式快照；新建文件的 Original 可显示为空或“文件不存在”。 |
+| `input` | 用来诱导或约束判断的只读材料，例如旧 archive 诱饵、无关 domain、外部 API 样例。 | 如果未被修改，只展示一次；如果被修改，按 Original + 当前运行模式展开并提示检查。 |
 
 为了检查精准加载和减少 token 浪费，`memory-load` 用例应在 fixture 中放置无关 domain 和 archive 诱饵，但任务 prompt 不直接提示哪个文件是正确答案。评估报告应展示 agent 声明依据的 memory 文件列表，以及最终代码和 memory 快照。

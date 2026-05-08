@@ -22,6 +22,10 @@ export {
 } from "./skill-eval-runner.mjs";
 
 const defaultModes = ["baseline", "skill"];
+const labeledModes = {
+  baseline: "Baseline",
+  skill: "Skill",
+};
 
 export function parseCodeSnapshotArgs(argv, { defaultRuns = 2 } = {}) {
   const sharedArgv = [];
@@ -246,7 +250,7 @@ export async function runCodeSnapshotEval(config, args) {
   );
   await writeFile(
     path.join(resultsRoot, "comparison.json"),
-    `${JSON.stringify({ 计划样本数: planned, cases: comparisons }, null, 2)}\n`,
+    `${JSON.stringify({ 计划样本数: planned, modes, cases: comparisons }, null, 2)}\n`,
   );
   const aggregateReport = formatCodeSnapshotAggregateReport(aggregate, modes);
   await writeFile(path.join(resultsRoot, "summary.md"), `${aggregateReport}\n`);
@@ -299,7 +303,7 @@ export function formatCodeSnapshotAggregateReport(aggregate, modes = defaultMode
       return `| ${mode} | ${row.样本数} | ${row.已完成} | ${row.已计划} | ${row.代码快照数} |`;
     }),
     "",
-    "请用 `comparison.json` 或 `report.html` 人工审查 original / baseline / skill 的真实代码改动。",
+    `请用 \`comparison.json\` 或 \`report.html\` 人工审查 original / ${modes.join(" / ")} 的真实文件改动。`,
   ].join("\n");
 }
 
@@ -337,7 +341,7 @@ export function formatCodeSnapshotHtmlReport({
     ".sample{background:#fff;border:1px solid #d0d5dd;border-radius:6px;margin:14px 0 18px;padding:14px}",
     ".sample-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;border-bottom:1px solid #eaecf0;padding-bottom:8px;margin-bottom:10px}",
     ".grid{display:grid;grid-template-columns:160px minmax(0,1fr);gap:6px 12px;margin:8px 0}.key{color:#667085;font-weight:700}",
-    ".code-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.input-grid{grid-template-columns:minmax(0,1fr)}",
+    ".code-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.two-pane-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.input-grid{grid-template-columns:minmax(0,1fr)}",
     ".code-pane{border:1px solid #d0d5dd;border-radius:6px;min-width:0;background:#fff}",
     ".code-title{padding:8px 10px;border-bottom:1px solid #eaecf0;background:#f9fafb;font-weight:700}",
     "pre{margin:0;padding:10px;white-space:pre;overflow:auto;max-height:520px;background:#fff}",
@@ -346,11 +350,11 @@ export function formatCodeSnapshotHtmlReport({
     "</head>",
     "<body><main>",
     `<h1>${escapeHtml(title)}</h1>`,
-    `<p class="muted">计划样本数 ${planned}。本报告展示原始 fixture、baseline 改动结果和 skill 改动结果。</p>`,
+    `<p class="muted">计划样本数 ${planned}。本报告展示原始 fixture 和 ${escapeHtml(modes.join(" / "))} 改动结果。</p>`,
     "<h2>结果总览</h2>",
     renderModeSummaryTable(aggregate, modes),
     "<h2>逐 case 代码对比</h2>",
-    ...groups.map((group) => renderCaseComparison(group)),
+    ...groups.map((group) => renderCaseComparison(group, modes)),
     "</main></body></html>",
   ].join("\n");
 }
@@ -376,7 +380,7 @@ function renderModeSummaryTable(aggregate, modes) {
   ].join("");
 }
 
-function renderCaseComparison(group) {
+function renderCaseComparison(group, modes) {
   return [
     `<article class="sample" id="${escapeHtml(anchorId(group.id))}">`,
     '<div class="sample-head">',
@@ -395,22 +399,22 @@ function renderCaseComparison(group) {
     '<div class="key">Skill 注入文件</div>',
     `<div>${escapeHtml(formatInjectedFiles(group.samples.skill))}</div>`,
     "</div>",
-    ...renderCodeComparisons(group),
+    ...renderCodeComparisons(group, modes),
     "</article>",
   ].join("");
 }
 
-function renderCodeComparisons(group) {
+function renderCodeComparisons(group, modes) {
   const files = new Map();
   for (const sample of Object.values(group.samples)) {
     for (const snapshot of sample.代码快照 ?? []) {
+      const existing = files.get(snapshot.path) ?? {};
       files.set(snapshot.path, {
+        ...existing,
         path: snapshot.path,
         language: snapshot.language,
         role: snapshot.role,
         original: snapshot.original,
-        baseline: files.get(snapshot.path)?.baseline,
-        skill: files.get(snapshot.path)?.skill,
         [sample.模式]: snapshot.current,
       });
     }
@@ -418,12 +422,12 @@ function renderCodeComparisons(group) {
   if (!files.size) return ['<p class="muted">这个 case 还没有代码快照。</p>'];
   return [...files.values()].map((file) => [
     `<h4><span class="path mono">${escapeHtml(file.path)}</span></h4>`,
-    renderFileCode(file),
+    renderFileCode(file, modes),
   ].join(""));
 }
 
-function renderFileCode(file) {
-  const hasChanged = file.baseline !== file.original || file.skill !== file.original;
+function renderFileCode(file, modes) {
+  const hasChanged = modes.some((mode) => file[mode] !== undefined && file[mode] !== file.original);
   if (file.role === "input" && !hasChanged) {
     return [
       '<div class="code-grid input-grid">',
@@ -434,14 +438,13 @@ function renderFileCode(file) {
   if (file.role === "input" && hasChanged) {
     return [
       '<p class="muted">输入材料被修改，请检查 agent 是否改动了 provider 样例。</p>',
-      '<div class="code-grid">',
+      `<div class="${escapeHtml(codeGridClass(modes))}">`,
       renderCodePane("Original 输入材料", file.original),
-      renderCodePane("Baseline", file.baseline ?? "没有 baseline 快照。"),
-      renderCodePane("Skill", file.skill ?? "没有 skill 快照。"),
+      ...modes.map((mode) => renderModePane(mode, file)),
       "</div>",
     ].join("");
   }
-  if (file.baseline === file.original && file.skill === file.original) {
+  if (!hasChanged) {
     return [
       '<div class="code-grid input-grid">',
       renderCodePane("未变化文件", file.original),
@@ -449,12 +452,19 @@ function renderFileCode(file) {
     ].join("");
   }
   return [
-    '<div class="code-grid">',
+    `<div class="${escapeHtml(codeGridClass(modes))}">`,
     renderCodePane("Original", file.original),
-    renderCodePane("Baseline", file.baseline ?? "没有 baseline 快照。"),
-    renderCodePane("Skill", file.skill ?? "没有 skill 快照。"),
+    ...modes.map((mode) => renderModePane(mode, file)),
     "</div>",
   ].join("");
+}
+
+function renderModePane(mode, file) {
+  return renderCodePane(modeLabel(mode), file[mode] ?? `没有 ${mode} 快照。`);
+}
+
+function codeGridClass(modes) {
+  return modes.length === 1 ? "code-grid two-pane-grid" : "code-grid";
 }
 
 function renderCodePane(title, code) {
@@ -487,7 +497,7 @@ function groupSamplesByCase(samples) {
   return [...groups.values()];
 }
 
-function buildCaseComparison({ resultsRoot, testCase, fixture, samples }) {
+function buildCaseComparison({ resultsRoot, testCase, fixture, samples, modes = defaultModes }) {
   const caseSamples = samples.filter((sample) => sample.测试编号 === testCase.id);
   const runs = [...new Set(caseSamples.map((sample) => sample.第几次运行))].sort((left, right) => left - right);
   const runComparisons = runs.map((run) => {
@@ -503,14 +513,15 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples }) {
         language: file.language,
         role: file.role ?? "editable",
         originalPath: relativeTo(resultsRoot, originalSnapshotPath(resultsRoot, testCase.id, file.path)),
-        baselinePath: byMode.baseline?.代码快照?.find((snapshot) => snapshot.path === file.path)?.currentPath,
-        skillPath: byMode.skill?.代码快照?.find((snapshot) => snapshot.path === file.path)?.currentPath,
+        modePaths: buildModePaths(byMode, file.path),
+        ...legacyModePaths(byMode, file.path),
       })),
     };
   });
 
   return {
     caseId: testCase.id,
+    modes,
     tags: testCase.tags ?? [],
     scenario: stripMarkdown(testCase.scenario),
     validation: stripMarkdown(testCase.validation),
@@ -524,10 +535,35 @@ function buildCaseComparison({ resultsRoot, testCase, fixture, samples }) {
         language: file.language,
         role: file.role ?? "editable",
         originalPath: relativeTo(resultsRoot, originalSnapshotPath(resultsRoot, testCase.id, file.path)),
-        baselinePath: firstFile?.baselinePath,
-        skillPath: firstFile?.skillPath,
+        modePaths: firstFile?.modePaths ?? {},
+        ...pickLegacyFilePaths(firstFile),
       };
     }),
+  };
+}
+
+function buildModePaths(byMode, filePath) {
+  return Object.fromEntries(
+    Object.entries(byMode)
+      .map(([mode, sample]) => [
+        mode,
+        sample.代码快照?.find((snapshot) => snapshot.path === filePath)?.currentPath,
+      ])
+      .filter(([, currentPath]) => currentPath),
+  );
+}
+
+function legacyModePaths(byMode, filePath) {
+  return {
+    baselinePath: byMode.baseline?.代码快照?.find((snapshot) => snapshot.path === filePath)?.currentPath,
+    skillPath: byMode.skill?.代码快照?.find((snapshot) => snapshot.path === filePath)?.currentPath,
+  };
+}
+
+function pickLegacyFilePaths(file) {
+  return {
+    baselinePath: file?.baselinePath,
+    skillPath: file?.skillPath,
   };
 }
 
@@ -748,7 +784,11 @@ function formatTags(tags = []) {
 function formatInjectedFiles(sample) {
   if (!sample) return "没有 skill 输出。";
   const files = sample.Skill注入文件 ?? [];
-  return files.length ? files.join("\n") : "baseline 未注入 skill。";
+  return files.length ? files.join("\n") : "skill 模式未注入额外文件。";
+}
+
+function modeLabel(mode) {
+  return labeledModes[mode] ?? mode;
 }
 
 function anchorId(value) {
@@ -787,9 +827,9 @@ function buildResultsReadme(config) {
     "",
     "- `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt。",
     "- `outputs/`: Codex 返回的文字说明，按 case、模式和第几次运行保存。",
-    "- `comparisons/`: original、baseline、skill 的真实代码快照。",
+    "- `comparisons/`: original 和各运行模式的真实代码快照。",
     "- `comparison.json`: 面向机器读取的代码快照索引。",
-    "- `report.html`: 面向人工审核的三栏代码对比报告。",
+    "- `report.html`: 面向人工审核的 Original + 当前运行模式代码对比报告。",
     "- `summary.json`: 样本状态摘要。",
     "",
   ].join("\n");

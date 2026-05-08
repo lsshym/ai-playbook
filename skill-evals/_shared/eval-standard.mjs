@@ -8,6 +8,7 @@ const allowedConfigKeys = new Set([
   "referenceMap",
   "fixtureModule",
   "promptInstructions",
+  "modes",
 ]);
 const allowedFileKeys = new Set([
   "path",
@@ -18,6 +19,7 @@ const allowedFileKeys = new Set([
   "missingContent",
 ]);
 const allowedRoles = new Set(["editable", "input"]);
+const allowedModes = new Set(["baseline", "skill"]);
 
 export async function collectEvalSuites(repoRoot) {
   const evalRoot = path.join(repoRoot, "skill-evals");
@@ -163,6 +165,9 @@ async function validateConfig(suite, issues) {
   if (value.fixtureModule !== "./fixtures.mjs") {
     issues.push(`${suite.name}: fixtureModule must be "./fixtures.mjs"`);
   }
+  if (value.modes !== undefined) {
+    issues.push(...validateModes(value.modes, suite.name));
+  }
 }
 
 async function validateFixtures(suite, issues) {
@@ -197,6 +202,27 @@ function validatePackageScripts(packageJson, suites, issues) {
       }
     }
   }
+}
+
+function validateModes(modes, suiteName) {
+  const issues = [];
+  if (!Array.isArray(modes) || modes.length < 1) {
+    return [`${suiteName}: modes must be a non-empty array`];
+  }
+  const seen = new Set();
+  for (const mode of modes) {
+    if (!allowedModes.has(mode)) {
+      issues.push(`${suiteName}: modes may only contain baseline or skill`);
+    }
+    if (seen.has(mode)) {
+      issues.push(`${suiteName}: modes contains duplicate ${mode}`);
+    }
+    seen.add(mode);
+  }
+  if (!seen.has("skill")) {
+    issues.push(`${suiteName}: modes must include skill`);
+  }
+  return issues;
 }
 
 function splitMarkdownRow(line) {

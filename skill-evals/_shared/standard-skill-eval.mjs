@@ -13,7 +13,7 @@ import { parseStandardCases } from "./eval-standard.mjs";
 import os from "node:os";
 import path from "node:path";
 
-const modes = ["baseline", "skill"];
+const defaultModes = ["baseline", "skill"];
 
 export async function loadEvalDefinition(repoRoot, evalName) {
   const evalDir = path.join(repoRoot, "skill-evals", evalName);
@@ -32,6 +32,7 @@ export function buildEvalDefinition({ repoRoot, evalDir, config, fixtures }) {
   const smokeCaseIds = config.smokeCaseIds ?? [];
   const defaultRuns = config.defaultRuns ?? 1;
   const referenceMap = config.referenceMap ?? {};
+  const modes = config.modes ?? defaultModes;
 
   const evalConfig = {
     repoRoot,
@@ -158,15 +159,15 @@ function buildResultsReadme(evalName) {
   return [
     `# ${evalName} 评估输出`,
     "",
-    `这个目录由 \`npm run eval:${evalName}\` 生成。`,
+    `这个目录由 \`npm run eval -- ${evalName}\` 生成。`,
     "",
     "## 目录说明",
     "",
     "- `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt。",
     "- `outputs/`: Codex 返回的文字说明，按 case、模式和第几次运行保存。",
-    "- `comparisons/`: original、baseline、skill 的真实文件快照。",
+    "- `comparisons/`: original 和各运行模式的真实文件快照。",
     "- `comparison.json`: 面向机器读取的文件快照索引。",
-    "- `report.html`: 面向人工审核的三栏文件对比报告。",
+    "- `report.html`: 面向人工审核的 Original + 当前运行模式文件对比报告。",
     "- `summary.json`: 样本状态摘要。",
     "",
   ].join("\n");

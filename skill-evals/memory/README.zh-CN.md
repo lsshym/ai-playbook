@@ -21,12 +21,13 @@ npm run eval:review -- memory
 ```
 
 默认 smoke 集合覆盖 `cases.zh-CN.md` 中全部首批用例，输出到 `.eval-runs/memory/`。
+memory eval 在 `eval.config.mjs` 中配置为 `modes: ["skill"]`，只运行注入目标 skill 的样本，不生成 baseline 对照组。
 
 ## 输出建议
 
 runner 生成：
 
-- `report.html`: 人工审查用的 Original / Baseline / Skill 三栏快照，外加触发判断摘要。
+- `report.html`: 人工审查用的 Original / Skill 快照，外加触发判断摘要。
 - `comparison.json`: 机器可读的文件快照索引。
 - `summary.json`: 样本状态摘要。
 - `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt。
@@ -35,20 +36,19 @@ runner 生成：
 
 `memory-load` 执行类用例还应在报告中展示 agent 声明依据的 memory 文件列表，便于人工检查是否做到精准读取。
 
-## 模式建议
+## 模式选择
 
-memory eval 仍以 `align-contracts` 的 `baseline` / `skill` 对比为主体：
+memory eval 不使用 baseline。这里测的是 `memory-setup`、`memory-load`、`memory-sync` 的触发协议和读写效果，普通 agent 的无 skill 表现没有稳定对照意义，反而容易把“协议是否正确”混成“模型是否猜到了 memory 规则”。
 
 | 模式 | 用途 |
 | --- | --- |
-| `baseline` | 明确不使用外部 skill，观察普通 agent 会怎样处理。 |
 | `skill` | 注入目标 skill 文本，测试触发判断和执行效果是否符合协议。 |
 
 触发要求不单独拆成浅层 case，而是写进每条用例的 `重点`：例如 `MEM-SETUP-03` 同时检查“普通工作不能自动 setup”和“缺少 memory root 时 load 应正常继续”。runner 可以从 `重点` 派生人工审查项，也可以在报告里展示模型最终说明以辅助判断。
 
 ## Prompt 约定
 
-`场景` 可以进入 prompt。`重点` 只能用于报告展示、人工审查和未来自动断言，不应原样进入 baseline/skill 任务 prompt。
+`场景` 可以进入 prompt。`重点` 只能用于报告展示、人工审查和未来自动断言，不应原样进入任务 prompt。
 
 执行类用例可以要求 agent 在最终说明中列出“本次依据的 memory 文件”，这是为了评估精准加载；但 prompt 不应泄露哪个 domain 或 subfile 是正确答案。
 

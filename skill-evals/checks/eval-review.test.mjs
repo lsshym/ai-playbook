@@ -89,6 +89,30 @@ test("eval review args support output, dry-run, and reasoning effort", () => {
   );
 });
 
+test("eval review supports skill-only results without baseline sections", async () => {
+  const repoRoot = await mkdtemp(path.join(tmpdir(), "eval-review-skill-only-"));
+  const resultsRoot = path.join(repoRoot, ".eval-runs", "memory");
+
+  try {
+    await writeSkillOnlyResults(resultsRoot);
+    const result = await runEvalReview({
+      repoRoot,
+      evalName: "memory",
+      dryRun: true,
+      log: () => {},
+    });
+    const prompt = await readFile(result.promptPath, "utf8");
+
+    assert.match(prompt, /本次结果模式：skill/);
+    assert.match(prompt, /Skill 输出：/);
+    assert.match(prompt, /memory evidence/);
+    assert.doesNotMatch(prompt, /Baseline 输出：/);
+    assert.doesNotMatch(prompt, /比 baseline 更符合预期/);
+  } finally {
+    await rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
 async function writeDemoResults(resultsRoot) {
   await mkdir(path.join(resultsRoot, "outputs", "DM-01"), { recursive: true });
   await mkdir(path.join(resultsRoot, "comparisons", "DM-01", "original", "src"), { recursive: true });
@@ -126,6 +150,41 @@ async function writeDemoResults(resultsRoot) {
           originalPath: "comparisons/DM-01/original/src/demo.ts",
           baselinePath: "comparisons/DM-01/baseline-1/src/demo.ts",
           skillPath: "comparisons/DM-01/skill-1/src/demo.ts",
+        }],
+      }],
+    }],
+  }, null, 2)}\n`);
+}
+
+async function writeSkillOnlyResults(resultsRoot) {
+  await mkdir(path.join(resultsRoot, "outputs", "MEM-LOAD-02"), { recursive: true });
+  await mkdir(path.join(resultsRoot, "comparisons", "MEM-LOAD-02", "original", "src"), { recursive: true });
+  await mkdir(path.join(resultsRoot, "comparisons", "MEM-LOAD-02", "skill-1", "src"), { recursive: true });
+  await writeFile(path.join(resultsRoot, "outputs", "MEM-LOAD-02", "skill-1.md"), "memory evidence\n");
+  await writeFile(path.join(resultsRoot, "comparisons", "MEM-LOAD-02", "original", "src", "checkout.ts"), "export const status = 'pending_payment';\n");
+  await writeFile(path.join(resultsRoot, "comparisons", "MEM-LOAD-02", "skill-1", "src", "checkout.ts"), "export const status = 'paid';\n");
+  await writeFile(path.join(resultsRoot, "summary.json"), `${JSON.stringify({
+    计划样本数: 1,
+    汇总: {
+      skill: { 样本数: 1, 已完成: 1 },
+    },
+  }, null, 2)}\n`);
+  await writeFile(path.join(resultsRoot, "comparison.json"), `${JSON.stringify({
+    计划样本数: 1,
+    modes: ["skill"],
+    cases: [{
+      caseId: "MEM-LOAD-02",
+      tags: ["folder-domain"],
+      scenario: "Load checkout memory.",
+      validation: "Read only relevant memory files.",
+      runs: [{
+        run: 1,
+        files: [{
+          path: "src/checkout.ts",
+          language: "ts",
+          role: "editable",
+          originalPath: "comparisons/MEM-LOAD-02/original/src/checkout.ts",
+          skillPath: "comparisons/MEM-LOAD-02/skill-1/src/checkout.ts",
         }],
       }],
     }],

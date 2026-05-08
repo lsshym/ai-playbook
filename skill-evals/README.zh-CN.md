@@ -14,7 +14,7 @@ npm run eval:review -- memory
 
 说明：
 
-- `npm run eval -- <eval-name>`: 真实运行 baseline/skill 对比，输出到 `.eval-runs/<eval-name>/`。
+- `npm run eval -- <eval-name>`: 按该 suite 的 `modes` 配置运行评估，输出到 `.eval-runs/<eval-name>/`。
 - `--dry-run`: 只生成 prompt、summary 和 comparison，不调用模型。
 - `--case ID`: 只跑一个 case。
 - `--cases A,B`: 跑多个指定 case。
@@ -30,11 +30,11 @@ npm run eval:review -- memory
 
 - `prompts/`: 每个 case、每个模式实际发送给 Codex 的 prompt。
 - `outputs/`: Codex 的文字输出。
-- `comparisons/`: original、baseline、skill 的文件快照。
+- `comparisons/`: original 和各运行模式的文件快照。
 - `comparison.json`: 机器可读的逐 case 快照索引。
 - `summary.json`: 样本状态摘要。
 - `summary.md`: 简短汇总。
-- `report.html`: 人工审查用的三栏对比报告。
+- `report.html`: 人工审查用的 Original + 当前运行模式对比报告。
 - `ai-review-prompt.md`: AI 分析报告 prompt，运行 review 后生成。
 - `ai-review.md`: AI 分析报告，运行非 dry-run review 后生成。
 
@@ -92,7 +92,8 @@ export default {
   },
   promptInstructions: [
     "请在最终说明中列出本次依据的 memory 文件；如果没有读取到 memory，请明确说明。"
-  ]
+  ],
+  modes: ["skill"]
 };
 ```
 
@@ -103,8 +104,11 @@ export default {
 - `fixtureModule`
 - `referenceMap`
 - `promptInstructions`
+- `modes`
 
 `evalName` 必须等于目录名，`fixtureModule` 必须是 `./fixtures.mjs`。
+
+`modes` 可选，默认是 `["baseline", "skill"]`。如果 suite 不需要对照组，可以设置为 `["skill"]`。目前只允许 `baseline` 和 `skill`，并且必须包含 `skill`。
 
 ## Fixture 标准
 
@@ -138,13 +142,13 @@ export function buildFixture(testCase) {
 `role` 只能是：
 
 - `editable`: agent 应该编辑或创建的文件。
-- `input`: 只读输入材料、诱饵或外部样例。若被修改，报告会展开三栏并提示检查。
+- `input`: 只读输入材料、诱饵或外部样例。若被修改，报告会按 Original + 当前运行模式展开并提示检查。
 
 `path` 必须是相对路径，不能使用绝对路径或 `..` 跳出 fixture 工作区。
 
 ## Prompt 防泄题
 
-统一 runner 只把 `场景` 放进任务 prompt。`重点` 用于报告展示和人工审查，不应原样进入 baseline/skill prompt。
+统一 runner 只把 `场景` 放进任务 prompt。`重点` 用于报告展示和人工审查，不应原样进入任务 prompt。
 
 如果某个 eval 需要额外说明，例如 memory eval 要求模型列出读取过的 memory 文件，把这类通用说明放在 `eval.config.mjs` 的 `promptInstructions`。
 
