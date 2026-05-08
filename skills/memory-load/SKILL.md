@@ -59,7 +59,3 @@ If uncertain, load memory.
 - **No rule substitution**: If memory specifies a canonical field or contract, do not replace it with a proxy field for convenience.
 - **Micro-logic comments**: For tiny code changes with large business impact, add a localized invariant comment in the target code, such as `// @business-rule: [WHY]` for English memory or `// @业务铁律: [WHY]` for Chinese memory.
 - **Reuse lookup boundary**: Reusable implementation lookup belongs to `reuse-select`. Do not read registry files during `memory-load` unless the user explicitly asks for registry context. If the task may require choosing an existing implementation, mention that `reuse-select` is the appropriate next capability.
-
-## Platform Entry Rules
-
-Platform startup files such as `AGENTS.md`, `CLAUDE.md`, or `.cursor/rules/*.mdc` should point agents to this protocol. Those files decide when to load memory; this skill defines how to load it.

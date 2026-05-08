@@ -36,13 +36,16 @@ test("memory case catalog exposes detailed smoke cases in the standard shape", a
   assert.deepEqual(cases[0].tags, ["setup", "empty-memory", "zh-CN"]);
   assert.equal(
     cases[0].scenario,
-    "空仓库中，用户明确说“初始化 Wingman memory”。fixture 初始没有 `.wingman/`、`AGENTS.md`、`CLAUDE.md` 或 `.cursor/rules/wingman-memory.mdc`。",
+    "空仓库中，用户明确说“初始化 Wingman memory”。fixture 初始没有 `.wingman/`。",
   );
   assert.equal(
     cases[0].focus,
-    "必须触发 `memory-setup`，不能只打印模板。执行后应创建 `.wingman/memory/`、`.wingman/memory/projectBrief.md`、`.wingman/memory/activeContext.md`、`.wingman/memory/domains/README.md`、`.wingman/memory/archive/README.md`，并创建平台入口文件。重点检查 memory root 是否完整、seed 内容是否符合 skill 模板、中文请求下 `projectBrief.md` 的 `Language` 是否设置为 `zh-CN`。",
+    "必须触发 `memory-setup`，不能只打印模板。执行后应创建 `.wingman/memory/`、`.wingman/memory/projectBrief.md`、`.wingman/memory/activeContext.md`、`.wingman/memory/domains/README.md`、`.wingman/memory/archive/README.md`。重点检查 memory root 是否完整、seed 内容是否符合 skill 模板、中文请求下 `projectBrief.md` 的 `Language` 是否设置为 `zh-CN`。不能创建或修改 `.wingman/memory` 之外的项目说明文件。",
   );
-  assert.match(cases.find((testCase) => testCase.id === "MEM-SETUP-02").focus, /允许按平台模板补充 Cursor frontmatter/);
+  assert.doesNotMatch(casesDoc, /AGENTS\.md/);
+  assert.doesNotMatch(casesDoc, /CLAUDE\.md/);
+  assert.doesNotMatch(casesDoc, /\.cursor\/rules/);
+  assert.doesNotMatch(casesDoc, /平台入口/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-02").focus, /遵守 `projectBrief\.md` 的 `Language: zh-CN`/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /短路/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /不能读取 memory/);
@@ -115,7 +118,7 @@ test("memory sync prompt treats completed work as memory-only sync", () => {
   assert.doesNotMatch(prompt, /短路；不能读取 memory/);
 });
 
-test("memory setup fixture tracks created memory and platform entry files", () => {
+test("memory setup fixture tracks only memory files", () => {
   const fixture = buildFixture({ id: "MEM-SETUP-01" });
 
   assert.deepEqual(fixture.files.map((file) => file.path), [
@@ -123,11 +126,35 @@ test("memory setup fixture tracks created memory and platform entry files", () =
     ".wingman/memory/activeContext.md",
     ".wingman/memory/domains/README.md",
     ".wingman/memory/archive/README.md",
-    "AGENTS.md",
-    "CLAUDE.md",
-    ".cursor/rules/wingman-memory.mdc",
   ]);
   assert.equal(fixture.files[0].initiallyExists, false);
+});
+
+test("memory setup fixture with existing project docs treats them as inputs that must remain unchanged", () => {
+  const fixture = buildFixture({ id: "MEM-SETUP-02" });
+  const byPath = new Map(fixture.files.map((file) => [file.path, file]));
+
+  assert.equal(byPath.get("README.md").role, "input");
+  assert.equal(byPath.get("docs/engineering.md").role, "input");
+  assert.equal(byPath.get("docs/release-checklist.md").role, "input");
+  assert.ok(byPath.has(".wingman/memory/projectBrief.md"));
+});
+
+test("public memory setup docs describe memory files only", async () => {
+  const readme = await readFile(path.join(repoRoot, "README.md"), "utf8");
+  const usingWingman = await readFile(path.join(repoRoot, "skills", "using-wingman", "SKILL.md"), "utf8");
+  const sectionStart = readme.indexOf("### `memory-setup`");
+  const sectionEnd = readme.indexOf("### `memory-load`", sectionStart);
+  const memorySetupSection = readme.slice(sectionStart, sectionEnd);
+
+  assert.match(memorySetupSection, /initialize Wingman memory files/);
+  assert.match(memorySetupSection, /\.wingman\/memory\/projectBrief\.md/);
+  assert.doesNotMatch(memorySetupSection, /platform entry/i);
+  assert.doesNotMatch(memorySetupSection, /AGENTS\.md/);
+  assert.doesNotMatch(memorySetupSection, /CLAUDE\.md/);
+  assert.doesNotMatch(memorySetupSection, /\.cursor\/rules/);
+  assert.match(usingWingman, /`memory-setup`: initialize Wingman memory files\./);
+  assert.doesNotMatch(usingWingman, /`memory-setup`: initialize Wingman memory files and platform entry files\./);
 });
 
 test("memory load folder-domain fixture includes relevant and irrelevant domain files", () => {

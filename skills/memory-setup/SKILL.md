@@ -26,12 +26,6 @@ Seed:
 - `.wingman/memory/domains/README.md`
 - `.wingman/memory/archive/README.md`
 
-Platform entry rules:
-
-- `AGENTS.md`
-- `CLAUDE.md`
-- `.cursor/rules/wingman-memory.mdc`
-
 ## Project Brief Template
 
 Write `.wingman/memory/projectBrief.md`:
@@ -133,53 +127,6 @@ Write `.wingman/memory/archive/README.md`:
 Cold storage for old active-context logs that should not load by default.
 
 Use monthly files such as `2026-04.md`. Move complete log blocks here; do not summarize archived logs unless the user asks.
-```
-
-## Platform Entry Rules
-
-Preserve existing project instructions. Only create, append, or replace the Wingman-managed block marked by:
-
-```markdown
-<!-- Wingman Memory:start -->
-...
-<!-- Wingman Memory:end -->
-```
-
-If a target file already exists, keep all non-Wingman content unchanged. If the marked block exists, replace only that block. If it does not exist, append the marked block.
-
-Create or update `AGENTS.md` with a Wingman section:
-
-```markdown
-<!-- Wingman Memory:start -->
-# Wingman Memory
-
-Before non-trivial coding, debugging, planning, review, API integration, or business-logic work:
-- Decide whether Wingman memory is needed.
-- Skip memory-load for trivial, isolated tasks with no business, reuse, or existing-behavior impact.
-- Use the `memory-load` protocol when the task is non-trivial, touches existing behavior, or you are uncertain.
-
-Before reporting meaningful coding work as complete:
-- Use the `memory-sync` protocol unless the user explicitly says "skip update", "不更新", "跳过记录", "这个不用记忆", or equivalent.
-<!-- Wingman Memory:end -->
-```
-
-Create or update `CLAUDE.md`:
-
-```markdown
-<!-- Wingman Memory:start -->
-@AGENTS.md
-<!-- Wingman Memory:end -->
-```
-
-Create or update `.cursor/rules/wingman-memory.mdc`:
-
-```markdown
----
-alwaysApply: true
-description: Load and sync Wingman memory for non-trivial project work.
----
-
-Follow the Wingman Memory instructions in `AGENTS.md`. Use `.wingman/memory` as the memory root.
 ```
 
 ## Binding Rules For Generated Entries

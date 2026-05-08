@@ -273,6 +273,8 @@ test("Codex payload 同步脚本必须指向 plugins/wingman 嵌入目录", asyn
   assert.match(script, /--bootstrap/);
   assert.match(script, /\.codex-plugin\/plugin\.json/);
   assert.match(script, /--exclude "plugins\/"/);
+  assert.match(script, /--exclude "skill-evals\/"/);
+  assert.match(script, /--exclude "\.eval-runs\/"/);
   assert.match(script, /--exclude "\.agents\/"/);
   assert.match(script, /--exclude "install-codex-wingman\.sh"/);
 });

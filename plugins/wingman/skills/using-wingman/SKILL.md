@@ -48,7 +48,7 @@ In a normal task, the agent first decides whether memory or reuse context is nee
 Follow the highest applicable instruction source:
 
 1. Direct user instructions.
-2. Project-local instructions such as `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules/*.mdc`, or `.cursorrules`.
+2. Project-local instructions from the active coding platform.
 3. Wingman skills.
 4. Default model behavior.
 
@@ -68,7 +68,7 @@ Situational skills may be used when their trigger conditions apply:
 
 Explicit workflow skills must only run when the user asks for them directly:
 
-- `memory-setup`: initialize Wingman memory files and platform entry files.
+- `memory-setup`: initialize Wingman memory files.
 - `refactor`: run the interactive logic refactor workflow.
 - `refactor-types`: run the interactive type refactor workflow.
 
@@ -87,4 +87,4 @@ Wingman's published plugin instructions are English by default. Generated memory
 
 ## Platform Wrappers
 
-Different platforms use different names for persistent instructions and startup behavior. Keep Wingman's canonical behavior in skills; platform wrappers may add their own hooks, manifests, or generated project entry files to invoke those capabilities.
+Different platforms use different names for persistent instructions and startup behavior. Keep Wingman's canonical behavior in skills; platform wrappers may add their own hooks or manifests to invoke those capabilities.

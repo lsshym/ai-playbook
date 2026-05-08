@@ -10,8 +10,8 @@ runner 应从下表解析用例 ID、目标 skill、环境标签、场景和重�
 
 | ID | Skill | 环境标签 | 场景 | 重点 |
 | --- | --- | --- | --- | --- |
-| MEM-SETUP-01 | memory-setup | setup, empty-memory, zh-CN | 空仓库中，用户明确说“初始化 Wingman memory”。fixture 初始没有 `.wingman/`、`AGENTS.md`、`CLAUDE.md` 或 `.cursor/rules/wingman-memory.mdc`。 | 必须触发 `memory-setup`，不能只打印模板。执行后应创建 `.wingman/memory/`、`.wingman/memory/projectBrief.md`、`.wingman/memory/activeContext.md`、`.wingman/memory/domains/README.md`、`.wingman/memory/archive/README.md`，并创建平台入口文件。重点检查 memory root 是否完整、seed 内容是否符合 skill 模板、中文请求下 `projectBrief.md` 的 `Language` 是否设置为 `zh-CN`。 |
-| MEM-SETUP-02 | memory-setup | setup, existing-entry-files, managed-block | 仓库已有 `AGENTS.md`、`CLAUDE.md`、`.cursor/rules/wingman-memory.mdc`，里面既有用户自定义规则，也有旧的 `<!-- Wingman Memory:start -->...<!-- Wingman Memory:end -->` 区块。用户明确要求重新初始化或刷新 Wingman memory。 | 必须触发 `memory-setup`。执行时只能替换 Wingman managed block，或在缺失 block 时追加 managed block；必须保留所有非 Wingman 内容。重点检查不能整文件重写、不能重复追加多个 Wingman block、不能改动用户自定义规则。允许按平台模板补充 Cursor frontmatter 中的 Wingman `description` 元信息。 |
+| MEM-SETUP-01 | memory-setup | setup, empty-memory, zh-CN | 空仓库中，用户明确说“初始化 Wingman memory”。fixture 初始没有 `.wingman/`。 | 必须触发 `memory-setup`，不能只打印模板。执行后应创建 `.wingman/memory/`、`.wingman/memory/projectBrief.md`、`.wingman/memory/activeContext.md`、`.wingman/memory/domains/README.md`、`.wingman/memory/archive/README.md`。重点检查 memory root 是否完整、seed 内容是否符合 skill 模板、中文请求下 `projectBrief.md` 的 `Language` 是否设置为 `zh-CN`。不能创建或修改 `.wingman/memory` 之外的项目说明文件。 |
+| MEM-SETUP-02 | memory-setup | setup, existing-project-docs, memory-only | 仓库已有若干项目说明文件，里面有用户自定义内容。用户明确要求重新初始化 Wingman memory。 | 必须触发 `memory-setup`。执行时只创建或补齐 `.wingman/memory/` 下的 seed 文件；既有项目说明文件必须保持原样。重点检查不能整文件重写、不能追加非 memory 配置、不能改动用户自定义规则。 |
 | MEM-SETUP-03 | memory-load | missing-memory, checkout | 仓库没有 `.wingman/memory`，用户只是要求修复 checkout webhook 状态流 bug，没有说初始化记忆系统，也没有手动调用 `/memory-setup`。 | 一般工作不能自动触发 `memory-setup`。这条的主路径是 `memory-load`：先判断是否存在 memory root，发现 `.wingman/memory` 不存在后安静继续。重点检查不会因为缺少 memory root 就擅自创建 `.wingman/`，不会把 setup 当成 load 的 fallback。 |
 | MEM-LOAD-01 | memory-load | multi-domain, checkout | memory 里有 `checkout`、`auth`、`billing` 多个 domain，`projectBrief.md` 的 domain registry 能指向这些 domain。用户要修 checkout webhook 状态流 bug，例如支付 webhook 已成功但订单仍停在 `pending_payment`。 | 应触发 `memory-load`，并精准加载 `projectBrief.md`、`activeContext.md`、`domains/README.md` 和 checkout domain。重点检查不加载 auth/billing/archive，不被无关 domain 里的诱饵规则带偏；最终代码应遵守 checkout 当前状态流规则，memory 文件不应被修改。 |
 | MEM-LOAD-02 | memory-load | folder-domain, checkout-status | checkout 是 folder domain，包含 `checkout/index.md`、`pricing.md`、`status-flow.md`、`api-contracts.md`。`index.md` 的 `Subfiles` 说明每个文件用途。用户任务只涉及支付成功后的订单状态流。 | 应触发 `memory-load`。重点检查是否先读 `checkout/index.md`，再只读 `status-flow.md` 等必要文件；不应全量读取 checkout 所有 subfiles，不应把 pricing 或 API contract 当状态流规则。报告里应展示 agent 声明依据的 memory 文件列表，用于人工审查读取范围。 |
@@ -28,7 +28,7 @@ memory eval 的 fixture 应包含两类文件：
 
 | 角色 | 含义 | 报告展示方式 |
 | --- | --- | --- |
-| `editable` | agent 应该编辑或创建的代码、memory 或平台入口文件。 | 按当前 `modes` 展示 Original 和运行模式快照；fixture 未声明但 agent 新建的文件也会进入快照，Original 显示为“文件不存在”。 |
+| `editable` | agent 应该编辑或创建的代码或 memory 文件。 | 按当前 `modes` 展示 Original 和运行模式快照；fixture 未声明但 agent 新建的文件也会进入快照，Original 显示为“文件不存在”。 |
 | `input` | 用来诱导或约束判断的只读材料，例如旧 archive 诱饵、无关 domain、外部 API 样例。 | 如果未被修改，只展示一次；如果被修改，按 Original + 当前运行模式展开并提示检查。 |
 
 为了检查精准加载和减少 token 浪费，`memory-load` 用例应在 fixture 中放置无关 domain 和 archive 诱饵，但任务 prompt 不直接提示哪个文件是正确答案。评估报告应展示 agent 声明依据的 memory 文件列表，以及最终代码和 memory 快照；该读取清单是弱证据，只有未来接入真实读取审计后才能严格证明“未读取某文件”。

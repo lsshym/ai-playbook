@@ -139,11 +139,11 @@ Good fit:
 
 Best for repositories with longer timelines, collaborative work, or codebases where durable context matters.
 
-Wingman stores project memory in `.wingman/memory/` inside the target repository. Platform entry files such as `AGENTS.md`, `CLAUDE.md`, and `.cursor/rules/wingman-memory.mdc` should point agents to the same memory root.
+Wingman stores project memory in `.wingman/memory/` inside the target repository. The memory skills read and write that directory directly; they do not create project instruction files.
 
 ### `memory-setup`
 
-Use once in a target repository to initialize Wingman memory and platform entry files.
+Use once in a target repository to initialize Wingman memory files.
 
 It creates:
 
@@ -151,9 +151,6 @@ It creates:
 - `.wingman/memory/activeContext.md`
 - `.wingman/memory/domains/README.md`
 - `.wingman/memory/archive/README.md`
-- `AGENTS.md`
-- `CLAUDE.md`
-- `.cursor/rules/wingman-memory.mdc`
 
 The generated memory files use English templates by default, with adaptive language controlled by `projectBrief.md` -> `Memory Settings` -> `Language`.
 
@@ -255,7 +252,7 @@ Platform wrappers stay thin:
 - `.claude-plugin/plugin.json`
 - `.claude-plugin/marketplace.json`
 
-Cross-platform means shared content and aligned public capability names, not guaranteed identical runtime behavior on every platform. The Codex manifest points at `skills/`; the Cursor manifest points at `skills/`; the Claude plugin manifest provides conservative metadata and relies on default `skills/` discovery, while `.claude-plugin/marketplace.json` is kept as a Claude Code marketplace shell. Platform-specific startup hooks or project entry files should invoke `using-wingman` instead of duplicating the plugin-level protocol.
+Cross-platform means shared content and aligned public capability names, not guaranteed identical runtime behavior on every platform. The Codex manifest points at `skills/`; the Cursor manifest points at `skills/`; the Claude plugin manifest provides conservative metadata and relies on default `skills/` discovery, while `.claude-plugin/marketplace.json` is kept as a Claude Code marketplace shell. Platform-specific startup hooks should invoke `using-wingman` instead of duplicating the plugin-level protocol.
 
 ## Local Testing
 

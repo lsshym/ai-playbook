@@ -97,6 +97,7 @@ RSYNC_ARGS=(
   --delete
   --delete-excluded
   --exclude ".DS_Store"
+  --exclude ".eval-runs/"
   --exclude ".git/"
   --exclude ".gitignore"
   --exclude ".agents/"
@@ -109,6 +110,7 @@ RSYNC_ARGS=(
   --exclude "package.json"
   --exclude "package-lock.json"
   --exclude "plugins/"
+  --exclude "skill-evals/"
   --exclude "scripts/"
   --exclude "tests/"
 )

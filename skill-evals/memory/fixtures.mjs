@@ -31,9 +31,6 @@ function buildMemSetup01Fixture() {
       missing(".wingman/memory/activeContext.md", "markdown"),
       missing(".wingman/memory/domains/README.md", "markdown"),
       missing(".wingman/memory/archive/README.md", "markdown"),
-      missing("AGENTS.md", "markdown"),
-      missing("CLAUDE.md", "markdown"),
-      missing(".cursor/rules/wingman-memory.mdc", "markdown"),
     ],
   };
 }
@@ -41,34 +38,19 @@ function buildMemSetup01Fixture() {
 function buildMemSetup02Fixture() {
   return {
     files: [
-      file("AGENTS.md", md(`# Existing Agent Rules
+      input("README.md", md(`# Existing Project Notes
 
 Keep the custom release checklist.
 
-<!-- Wingman Memory:start -->
-# Old Wingman Memory
-Use stale root.
-<!-- Wingman Memory:end -->
-
 Do not remove this deployment note.
 `)),
-      file("CLAUDE.md", md(`# Claude Local Rules
+      input("docs/engineering.md", md(`# Engineering Notes
 
-Preserve this custom Claude note.
-
-<!-- Wingman Memory:start -->
-@OLD_AGENTS.md
-<!-- Wingman Memory:end -->
+Preserve this custom engineering note.
 `)),
-      file(".cursor/rules/wingman-memory.mdc", md(`---
-alwaysApply: true
----
+      input("docs/release-checklist.md", md(`# Release Checklist
 
-Custom Cursor note must remain.
-
-<!-- Wingman Memory:start -->
-Old memory pointer.
-<!-- Wingman Memory:end -->
+Custom release checklist note must remain.
 `)),
       missing(".wingman/memory/projectBrief.md", "markdown"),
       missing(".wingman/memory/activeContext.md", "markdown"),
