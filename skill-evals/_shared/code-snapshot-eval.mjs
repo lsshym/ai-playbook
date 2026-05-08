@@ -541,7 +541,7 @@ async function writeOriginalComparisonFiles({ resultsRoot, testCase, fixture }) 
   for (const file of fixture.files) {
     const target = originalSnapshotPath(resultsRoot, testCase.id, file.path);
     await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, file.content);
+    await writeFile(target, originalContentForFile(file));
   }
 }
 
@@ -559,9 +559,10 @@ async function prepareSampleWorkdir(workdir, fixture, config) {
   );
   await writeFile(path.join(workdir, "package.json"), JSON.stringify({ type: "module" }, null, 2));
   for (const file of fixture.files) {
+    if (file.initiallyExists === false) continue;
     const target = path.join(workdir, file.path);
     await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, file.content);
+    await writeFile(target, file.content ?? "");
   }
 }
 
@@ -612,7 +613,11 @@ async function copySnapshot({ workdir, snapshotRoot, fixture }) {
     const source = path.join(workdir, file.path);
     const target = path.join(snapshotRoot, file.path);
     await mkdir(path.dirname(target), { recursive: true });
-    await cp(source, target);
+    if (await exists(source)) {
+      await cp(source, target);
+    } else {
+      await writeFile(target, missingFileSnapshotContent(file));
+    }
   }
 }
 
@@ -634,6 +639,17 @@ async function collectSnapshots({ resultsRoot, testCase, mode, run, fixture, sna
     });
   }
   return snapshots;
+}
+
+function originalContentForFile(file) {
+  if (file.initiallyExists === false) {
+    return file.originalContent ?? missingFileSnapshotContent(file);
+  }
+  return file.content ?? "";
+}
+
+function missingFileSnapshotContent(file) {
+  return file.missingContent ?? "[[file does not exist]]\n";
 }
 
 function buildCodeSnapshotSampleSummary({
