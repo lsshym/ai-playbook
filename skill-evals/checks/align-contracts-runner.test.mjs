@@ -5,37 +5,26 @@ import path from "node:path";
 import test from "node:test";
 
 import {
-  aggregateSummary,
-  buildCaseFixture,
-  buildPrompt,
-  formatAggregateReport,
-  formatConsoleSummary,
-  formatHtmlReport,
-  parseArgs,
-  parseCasesFromReport,
-  resolveSkillBundle,
-  runAlignContractsEval,
-  selectCasesForRun,
-} from "../align-contracts/runner.mjs";
+  resolveCodeSnapshotSkillBundle,
+} from "../_shared/code-snapshot-eval.mjs";
+import { loadEvalDefinition } from "../_shared/standard-skill-eval.mjs";
+import { buildFixture } from "../align-contracts/fixtures.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
+const definition = await loadEvalDefinition(repoRoot, "align-contracts");
 
 test("align-contracts case catalog exposes the curated core cases", async () => {
   const casesDoc = await readFile(
     path.join(repoRoot, "skill-evals", "align-contracts", "cases.zh-CN.md"),
     "utf8",
   );
-  const cases = parseCasesFromReport(casesDoc);
+  const cases = definition.parseCasesFromReport(casesDoc);
 
   assert.equal(cases.length, 6);
-  assert.deepEqual(cases[0], {
-    id: "AC-S01",
-    tags: ["react-typescript"],
-    scenario: "API 返回 `user_name`，页面里临时定义的 `UserViewModel` 只在当前组件内展示用户名。",
-    validation: "测回答能不能看出局部/临时 consumer type 可以改，不需要为了一个展示字段新增 adapter。",
-    baselineRisk: "为了保留临时 `UserViewModel.userName` 新增 `toUserViewModel()`，把一个局部字段变成不必要架构。",
-    skillExpected: "判断 consumer type 是本地页面展示契约；直接改成本地 alias 或读 `user_name`，不新增 adapter，也不要求后端改字段。",
-  });
+  assert.equal(cases[0].skill, "align-contracts");
+  assert.deepEqual(cases[0].tags, ["react-typescript"]);
+  assert.equal(cases[0].scenario, "API 返回 `user_name`，页面里临时定义的 `UserViewModel` 只在当前组件内展示用户名。");
+  assert.match(cases[0].focus, /局部\/临时 consumer type/);
   assert.deepEqual(cases.map((testCase) => testCase.id), [
     "AC-S01",
     "AC-S02",
@@ -51,8 +40,8 @@ test("align-contracts defaults to a compact smoke case set", async () => {
     path.join(repoRoot, "skill-evals", "align-contracts", "cases.zh-CN.md"),
     "utf8",
   );
-  const cases = parseCasesFromReport(casesDoc);
-  const selected = selectCasesForRun(cases, {});
+  const cases = definition.parseCasesFromReport(casesDoc);
+  const selected = definition.selectCasesForRun(cases, {});
 
   assert.deepEqual(selected.map((testCase) => testCase.id), [
     "AC-S01",
@@ -65,7 +54,7 @@ test("align-contracts defaults to a compact smoke case set", async () => {
 });
 
 test("align-contracts args default to smoke runs and low reasoning", () => {
-  assert.deepEqual(parseArgs([]), {
+  assert.deepEqual(definition.parseArgs([]), {
     caseIds: [],
     dryRun: false,
     reasoningEffort: "low",
@@ -87,7 +76,7 @@ test("align-contracts eval keeps only a short local README, not a long static re
 });
 
 test("align-contracts args can run a named case without changing the case table", () => {
-  assert.deepEqual(parseArgs(["--case", "AC-S05", "--runs", "1", "--dry-run"]), {
+  assert.deepEqual(definition.parseArgs(["--case", "AC-S05", "--runs", "1", "--dry-run"]), {
     caseIds: ["AC-S05"],
     dryRun: true,
     reasoningEffort: "low",
@@ -97,22 +86,33 @@ test("align-contracts args can run a named case without changing the case table"
 });
 
 test("resolveSkillBundle injects React references only for React cases", async () => {
-  const reactBundle = await resolveSkillBundle("align-contracts", ["react-typescript"]);
+  const reactBundle = await resolveCodeSnapshotSkillBundle({
+    repoRoot,
+    skillName: "align-contracts",
+    tags: ["react-typescript"],
+    referenceMap: definition.config.referenceMap,
+  });
   assert.deepEqual(reactBundle.files.map((file) => file.path), [
     "skills/align-contracts/SKILL.md",
     "skills/align-contracts/references/frontend-react-typescript.md",
   ]);
 
-  const dbBundle = await resolveSkillBundle("align-contracts", ["db"]);
+  const dbBundle = await resolveCodeSnapshotSkillBundle({
+    repoRoot,
+    skillName: "align-contracts",
+    tags: ["db"],
+    referenceMap: definition.config.referenceMap,
+  });
   assert.deepEqual(dbBundle.files.map((file) => file.path), [
     "skills/align-contracts/SKILL.md",
   ]);
 });
 
 test("baseline prompt asks the agent to edit fixture code without leaking review notes", () => {
-  const prompt = buildPrompt(
+  const prompt = definition.buildPrompt(
     {
       id: "AC-S03",
+      skill: "align-contracts",
       tags: ["react-typescript"],
       scenario: "API 的 `status` 要接到 UI 的 `checkoutType`。",
       validation: "语义差异识别；不把两个“状态”随手等同。",
@@ -124,7 +124,7 @@ test("baseline prompt asks the agent to edit fixture code without leaking review
     [],
   );
 
-  assert.match(prompt, /请直接编辑当前工作区里的代码文件/);
+  assert.match(prompt, /请直接编辑当前工作区里的文件/);
   assert.match(prompt, /场景：API 的 status 要接到 UI 的 checkoutType。/);
   assert.match(prompt, /不要使用或提到任何外部 skill/);
   assert.doesNotMatch(prompt, /这条在测什么/);
@@ -136,9 +136,10 @@ test("baseline prompt asks the agent to edit fixture code without leaking review
 });
 
 test("skill prompt injects skill text but still hides review notes", () => {
-  const prompt = buildPrompt(
+  const prompt = definition.buildPrompt(
     {
       id: "AC-S05",
+      skill: "align-contracts",
       tags: ["react-typescript"],
       scenario: "共享 `Money` 组件直接依赖 `ApiOrder[\"amount\"]`。",
       validation: "通用组件不能耦合 provider-specific payload。",
@@ -160,7 +161,7 @@ test("skill prompt injects skill text but still hides review notes", () => {
 });
 
 test("buildCaseFixture returns local consumer type fixture for AC-S01", () => {
-  const fixture = buildCaseFixture({
+  const fixture = buildFixture({
     id: "AC-S01",
     tags: ["react-typescript"],
     scenario: "API 返回 `user_name`，页面里临时定义的 `UserViewModel` 只在当前组件内展示用户名。",
@@ -175,7 +176,7 @@ test("buildCaseFixture returns local consumer type fixture for AC-S01", () => {
 });
 
 test("buildCaseFixture returns shared domain boundary fixture for AC-S02", () => {
-  const fixture = buildCaseFixture({
+  const fixture = buildFixture({
     id: "AC-S02",
     tags: ["api", "domain"],
     scenario: "外部 API 返回 snake_case 用户，但共享 domain `User` 使用 camelCase。",
@@ -190,7 +191,7 @@ test("buildCaseFixture returns shared domain boundary fixture for AC-S02", () =>
 });
 
 test("buildCaseFixture returns reusable Money component fixture for AC-S05", () => {
-  const fixture = buildCaseFixture({
+  const fixture = buildFixture({
     id: "AC-S05",
     tags: ["react-typescript"],
     scenario: "共享 `Money` 组件直接依赖 `ApiOrder[\"amount\"]`。",
@@ -207,7 +208,7 @@ test("buildCaseFixture returns reusable Money component fixture for AC-S05", () 
 });
 
 test("aggregate and console summaries report samples and code snapshots only", () => {
-  const aggregate = aggregateSummary([
+  const aggregate = definition.aggregateSummary([
     {
       测试编号: "AC-S05",
       模式: "baseline",
@@ -226,14 +227,14 @@ test("aggregate and console summaries report samples and code snapshots only", (
   assert.equal(aggregate.baseline.代码快照数, 1);
   assert.equal(aggregate.skill.样本数, 1);
   assert.equal(aggregate.案例数, 1);
-  assert.doesNotMatch(formatConsoleSummary(aggregate), /关键期望/);
-  assert.doesNotMatch(formatAggregateReport(aggregate), /风险错误/);
-  assert.match(formatAggregateReport(aggregate), /代码快照/);
+  assert.doesNotMatch(definition.formatConsoleSummary(aggregate), /关键期望/);
+  assert.doesNotMatch(definition.formatAggregateReport(aggregate), /风险错误/);
+  assert.match(definition.formatAggregateReport(aggregate), /代码快照/);
 });
 
 test("formatHtmlReport renders original, baseline, and skill code columns", () => {
-  const html = formatHtmlReport({
-    aggregate: aggregateSummary([]),
+  const html = definition.formatHtmlReport({
+    aggregate: definition.aggregateSummary([]),
     planned: 2,
     samples: [
       {
@@ -306,8 +307,8 @@ test("formatHtmlReport renders provider fixture input files once", () => {
     "  }",
     "}",
   ].join("\n");
-  const html = formatHtmlReport({
-    aggregate: aggregateSummary([]),
+  const html = definition.formatHtmlReport({
+    aggregate: definition.aggregateSummary([]),
     planned: 2,
     samples: [
       {
@@ -356,8 +357,8 @@ test("formatHtmlReport renders provider fixture input files once", () => {
 test("formatHtmlReport expands input files if an agent edits them", () => {
   const original = "{\n  \"id\": \"ord_123\"\n}";
   const changed = "{\n  \"id\": \"ord_999\"\n}";
-  const html = formatHtmlReport({
-    aggregate: aggregateSummary([]),
+  const html = definition.formatHtmlReport({
+    aggregate: definition.aggregateSummary([]),
     planned: 2,
     samples: [
       {
@@ -404,7 +405,7 @@ test("formatHtmlReport expands input files if an agent edits them", () => {
 
 test("dry run writes planned samples without legacy evaluation fields", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "align-contracts-"));
-  await runAlignContractsEval({
+  await definition.run({
     dryRun: true,
     limit: 1,
     runs: 1,
@@ -424,7 +425,7 @@ test("dry run writes planned samples without legacy evaluation fields", async ()
 
 test("default dry run plans the compact smoke matrix", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "align-contracts-smoke-"));
-  await runAlignContractsEval({
+  await definition.run({
     dryRun: true,
     output: root,
     log: () => {},

@@ -4,23 +4,18 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import {
-  buildCaseFixture,
-  buildPrompt,
-  parseArgs,
-  parseCasesFromReport,
-  runMemoryEval,
-  selectCasesForRun,
-} from "../memory/runner.mjs";
+import { loadEvalDefinition } from "../_shared/standard-skill-eval.mjs";
+import { buildFixture } from "../memory/fixtures.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
+const definition = await loadEvalDefinition(repoRoot, "memory");
 
-test("memory case catalog exposes detailed smoke cases in the four-column shape", async () => {
+test("memory case catalog exposes detailed smoke cases in the standard shape", async () => {
   const casesDoc = await readFile(
     path.join(repoRoot, "skill-evals", "memory", "cases.zh-CN.md"),
     "utf8",
   );
-  const cases = parseCasesFromReport(casesDoc);
+  const cases = definition.parseCasesFromReport(casesDoc);
 
   assert.equal(cases.length, 11);
   assert.deepEqual(cases.map((testCase) => testCase.id), [
@@ -38,6 +33,7 @@ test("memory case catalog exposes detailed smoke cases in the four-column shape"
   ]);
   assert.equal(cases[0].id, "MEM-SETUP-01");
   assert.equal(cases[0].skill, "memory-setup");
+  assert.deepEqual(cases[0].tags, ["setup", "empty-memory", "zh-CN"]);
   assert.equal(
     cases[0].scenario,
     "空仓库中，用户明确说“初始化 Wingman memory”。fixture 初始没有 `.wingman/`、`AGENTS.md`、`CLAUDE.md` 或 `.cursor/rules/wingman-memory.mdc`。",
@@ -53,14 +49,14 @@ test("memory defaults to all curated smoke cases", async () => {
     path.join(repoRoot, "skill-evals", "memory", "cases.zh-CN.md"),
     "utf8",
   );
-  const cases = parseCasesFromReport(casesDoc);
-  const selected = selectCasesForRun(cases, {});
+  const cases = definition.parseCasesFromReport(casesDoc);
+  const selected = definition.selectCasesForRun(cases, {});
 
   assert.deepEqual(selected.map((testCase) => testCase.id), cases.map((testCase) => testCase.id));
 });
 
 test("memory args default to one dry-run capable smoke matrix", () => {
-  assert.deepEqual(parseArgs([]), {
+  assert.deepEqual(definition.parseArgs([]), {
     caseIds: [],
     dryRun: false,
     reasoningEffort: "low",
@@ -70,7 +66,7 @@ test("memory args default to one dry-run capable smoke matrix", () => {
 });
 
 test("memory prompt injects only the row scenario and hides focus details", () => {
-  const prompt = buildPrompt(
+  const prompt = definition.buildPrompt(
     {
       id: "MEM-LOAD-02",
       skill: "memory-load",
@@ -91,7 +87,7 @@ test("memory prompt injects only the row scenario and hides focus details", () =
 });
 
 test("memory setup fixture tracks created memory and platform entry files", () => {
-  const fixture = buildCaseFixture({ id: "MEM-SETUP-01" });
+  const fixture = buildFixture({ id: "MEM-SETUP-01" });
 
   assert.deepEqual(fixture.files.map((file) => file.path), [
     ".wingman/memory/projectBrief.md",
@@ -106,7 +102,7 @@ test("memory setup fixture tracks created memory and platform entry files", () =
 });
 
 test("memory load folder-domain fixture includes relevant and irrelevant domain files", () => {
-  const fixture = buildCaseFixture({ id: "MEM-LOAD-02" });
+  const fixture = buildFixture({ id: "MEM-LOAD-02" });
   const paths = fixture.files.map((file) => file.path);
 
   assert.deepEqual(paths, [
@@ -124,7 +120,7 @@ test("memory load folder-domain fixture includes relevant and irrelevant domain 
 });
 
 test("memory sync domain-truth fixture includes unrelated domains to catch pollution", () => {
-  const fixture = buildCaseFixture({ id: "MEM-SYNC-02" });
+  const fixture = buildFixture({ id: "MEM-SYNC-02" });
   const paths = fixture.files.map((file) => file.path);
 
   assert.ok(paths.includes(".wingman/memory/domains/checkout.md"));
@@ -135,7 +131,7 @@ test("memory sync domain-truth fixture includes unrelated domains to catch pollu
 
 test("memory dry run writes prompts, summary, and comparison index", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "memory-eval-"));
-  await runMemoryEval({
+  await definition.run({
     dryRun: true,
     limit: 1,
     runs: 1,

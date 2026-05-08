@@ -26,10 +26,8 @@
     "test:package": "node --test tests/package/*.test.mjs",
     "test:behavior": "node --test tests/behavior/*.test.mjs skill-evals/checks/*.test.mjs",
     "check:plugin": "node scripts/check-plugin.mjs",
-    "eval:align-contracts": "node skill-evals/align-contracts/runner.mjs",
-    "eval:align-contracts:dry-run": "node skill-evals/align-contracts/runner.mjs --dry-run",
-    "eval:memory": "node skill-evals/memory/runner.mjs",
-    "eval:memory:dry-run": "node skill-evals/memory/runner.mjs --dry-run",
+    "eval": "node skill-evals/run.mjs",
+    "eval:review": "node skill-evals/review.mjs",
     "prepare:codex-local": "bash scripts/sync-to-codex-plugin.sh --dest ."
   },
   "author": "keni",

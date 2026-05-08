@@ -156,7 +156,7 @@ export async function runCodeSnapshotEval(config, args) {
 
     for (const mode of modes) {
       const skillBundle = mode === "skill"
-        ? await loadSkillBundle(config, testCase.tags)
+        ? await loadSkillBundle(config, testCase)
         : { text: "", files: [] };
       const injectedFiles = skillBundle.files.map((file) => file.path);
       const prompt = (config.buildPrompt ?? buildCodeSnapshotEvalPrompt)({
@@ -695,9 +695,10 @@ function normalizeFixture(fixture) {
   };
 }
 
-function loadSkillBundle(config, tags = []) {
+function loadSkillBundle(config, testCase) {
+  const tags = testCase.tags ?? [];
   if (config.resolveSkillBundle) {
-    return config.resolveSkillBundle(config.skillName, tags);
+    return config.resolveSkillBundle(config.skillName, tags, testCase);
   }
   return resolveCodeSnapshotSkillBundle({
     repoRoot: config.repoRoot,

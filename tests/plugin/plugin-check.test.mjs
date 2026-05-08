@@ -245,7 +245,7 @@ test("显式 workflow skill 必须保持只在用户明确请求时触发", asyn
   }
 });
 
-test("package scripts 只暴露本仓库 Codex payload 同步入口", async () => {
+test("package scripts 暴露简洁的测试、eval 和 payload 同步入口", async () => {
   const packageJson = JSON.parse(
     await readFile(path.join(repoRoot, "package.json"), "utf8"),
   );
@@ -256,11 +256,10 @@ test("package scripts 只暴露本仓库 Codex payload 同步入口", async () =
     "bash scripts/sync-to-codex-plugin.sh --dest .",
   );
   assert.equal(packageJson.scripts["eval:align-contracts:full"], undefined);
+  assert.equal(packageJson.scripts["eval:align-contracts"], undefined);
   assert.equal(packageJson.scripts["eval:align-contracts:review"], undefined);
-  assert.equal(
-    packageJson.scripts["eval:align-contracts"],
-    "node skill-evals/align-contracts/runner.mjs",
-  );
+  assert.equal(packageJson.scripts.eval, "node skill-evals/run.mjs");
+  assert.equal(packageJson.scripts["eval:review"], "node skill-evals/review.mjs");
 });
 
 test("Codex payload 同步脚本必须指向 plugins/wingman 嵌入目录", async () => {
