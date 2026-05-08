@@ -42,6 +42,11 @@ test("memory case catalog exposes detailed smoke cases in the standard shape", a
     cases[0].focus,
     "必须触发 `memory-setup`，不能只打印模板。执行后应创建 `.wingman/memory/`、`.wingman/memory/projectBrief.md`、`.wingman/memory/activeContext.md`、`.wingman/memory/domains/README.md`、`.wingman/memory/archive/README.md`，并创建平台入口文件。重点检查 memory root 是否完整、seed 内容是否符合 skill 模板、中文请求下 `projectBrief.md` 的 `Language` 是否设置为 `zh-CN`。",
   );
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SETUP-02").focus, /允许按平台模板补充 Cursor frontmatter/);
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-02").focus, /遵守 `projectBrief\.md` 的 `Language: zh-CN`/);
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /短路/);
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /不能读取 memory/);
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /不能额外修改业务代码/);
 });
 
 test("memory defaults to all curated smoke cases", async () => {
@@ -89,6 +94,27 @@ test("memory prompt injects only the row scenario and hides focus details", () =
   assert.doesNotMatch(prompt, /status-flow\.md；不全量读取/);
 });
 
+test("memory sync prompt treats completed work as memory-only sync", () => {
+  const prompt = definition.buildPrompt(
+    {
+      id: "MEM-SYNC-04",
+      skill: "memory-sync",
+      tags: ["user-override", "skip-update"],
+      scenario: "已完成一个有意义的 checkout bugfix，但用户明确说“这个不用记忆 / skip update / 不更新”。",
+      focus: "短路；不能读取 memory；不能额外修改业务代码。",
+    },
+    "skill",
+    "# Wingman Memory Sync",
+    ["skills/memory-sync/SKILL.md"],
+  );
+
+  assert.match(prompt, /memory-sync 用例中，场景描述的工作视为已经完成/);
+  assert.match(prompt, /不要为了满足 eval 再修改业务代码/);
+  assert.match(prompt, /不要读取、创建或修改 `\.wingman\/memory`/);
+  assert.match(prompt, /Memory files used:/);
+  assert.doesNotMatch(prompt, /短路；不能读取 memory/);
+});
+
 test("memory setup fixture tracks created memory and platform entry files", () => {
   const fixture = buildFixture({ id: "MEM-SETUP-01" });
 
@@ -130,6 +156,14 @@ test("memory sync domain-truth fixture includes unrelated domains to catch pollu
   assert.ok(paths.includes(".wingman/memory/domains/auth.md"));
   assert.ok(paths.includes(".wingman/memory/domains/billing.md"));
   assert.match(fixture.files.find((file) => file.path.endsWith("checkout.md")).content, /order_status/);
+});
+
+test("memory sync skip fixture treats completed code as input context", () => {
+  const fixture = buildFixture({ id: "MEM-SYNC-04" });
+  const codeFile = fixture.files.find((file) => file.path === "src/checkoutWebhook.ts");
+
+  assert.equal(codeFile.role, "input");
+  assert.match(codeFile.content, /payment\.succeeded/);
 });
 
 test("memory dry run writes prompts, summary, and comparison index", async () => {

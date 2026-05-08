@@ -36,6 +36,8 @@ runner 生成：
 
 `memory-load` 执行类用例会要求 agent 用 `Memory files used:` 固定格式声明依据的 memory 文件，便于人工检查读取范围。这个清单目前是弱证据，不等同于真实读取审计日志。
 
+`memory-sync` 用例把场景里的业务改动视为已完成，主要测试 memory 写入、跳过或拒绝记录的行为。尤其是用户明确 skip 的 case，应立即短路：不读 memory、不写 memory、不再额外改业务代码。
+
 ## 模式选择
 
 memory eval 不使用 baseline。这里测的是 `memory-setup`、`memory-load`、`memory-sync` 的触发协议和读写效果，普通 agent 的无 skill 表现没有稳定对照意义，反而容易把“协议是否正确”混成“模型是否猜到了 memory 规则”。
@@ -51,6 +53,8 @@ memory eval 不使用 baseline。这里测的是 `memory-setup`、`memory-load`�
 `场景` 可以进入 prompt。`重点` 只能用于报告展示、人工审查和未来自动断言，不应原样进入任务 prompt。
 
 执行类用例要求 agent 在最终说明中列出“本次依据的 memory 文件”，这是为了辅助评估精准加载；但 prompt 不应泄露哪个 domain 或 subfile 是正确答案。没有真实读取审计日志时，只能把该清单当作 agent 自报。
+
+`memory-sync` 的 prompt 会额外说明“业务工作已完成”，避免模型为了满足通用代码快照 runner 而再次修改业务文件。对于 user override 场景，`Memory files used` 应为 `无`。
 
 ## 怎么加 case
 

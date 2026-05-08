@@ -254,7 +254,7 @@ function buildMemSync04Fixture() {
       file(".wingman/memory/activeContext.md", activeContext("Existing log should not change.")),
       file(".wingman/memory/domains/README.md", domainReadme()),
       file(".wingman/memory/domains/checkout.md", checkoutDomain()),
-      file("src/checkoutWebhook.ts", checkoutWebhookFixed()),
+      input("src/checkoutWebhook.ts", checkoutWebhookFixed()),
     ],
   };
 }

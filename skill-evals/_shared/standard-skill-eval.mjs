@@ -56,7 +56,7 @@ export function buildEvalDefinition({ repoRoot, evalDir, config, fixtures }) {
       skillText: options.skillText,
       injectedFiles: options.injectedFiles,
       environment: inferEnvironment(options.testCase),
-      promptInstructions: config.promptInstructions ?? [],
+      promptInstructions: resolvePromptInstructions(config, options.testCase),
     }),
     resolveSkillBundle: (name, tags, testCase) => resolveSkillBundle({
       repoRoot,
@@ -81,7 +81,7 @@ export function buildEvalDefinition({ repoRoot, evalDir, config, fixtures }) {
       skillText,
       injectedFiles,
       environment: inferEnvironment(testCase),
-      promptInstructions: config.promptInstructions ?? [],
+      promptInstructions: resolvePromptInstructions(config, testCase),
     }),
     parseArgs: (argv) => parseCodeSnapshotArgs(argv, { defaultRuns }),
     aggregateSummary: (samples) => aggregateCodeSnapshotSummary(samples, modes),
@@ -97,6 +97,13 @@ export function buildEvalDefinition({ repoRoot, evalDir, config, fixtures }) {
     run: (args) => runCodeSnapshotEval(evalConfig, args),
     config: evalConfig,
   };
+}
+
+function resolvePromptInstructions(config, testCase) {
+  if (typeof config.promptInstructions === "function") {
+    return config.promptInstructions(testCase);
+  }
+  return config.promptInstructions ?? [];
 }
 
 export function parseCasesFromReport(report) {
