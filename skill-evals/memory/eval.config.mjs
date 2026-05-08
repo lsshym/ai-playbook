@@ -8,7 +8,6 @@ export default {
       ? [
           "memory-sync 用例中，场景描述的工作视为已经完成；本次任务只评估 memory-sync 的记录/跳过行为。",
           "不要为了满足 eval 再修改业务代码；只有 memory-sync 协议明确要求写入 memory 时才编辑 `.wingman/memory`。",
-          "如果场景包含“这个不用记忆 / skip update / 不更新”等用户覆盖语义，请立即短路：不要读取、创建或修改 `.wingman/memory`，不要额外修改业务代码，只报告已按用户要求跳过。",
         ]
       : []),
     "请在最终说明中列出本次依据的 memory 文件；如果没有读取到 memory，请明确说明。",

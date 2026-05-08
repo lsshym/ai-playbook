@@ -5,6 +5,7 @@ export function buildFixture(testCase) {
     "MEM-SETUP-01": buildMemSetup01Fixture,
     "MEM-SETUP-02": buildMemSetup02Fixture,
     "MEM-SETUP-03": buildMemSetup03Fixture,
+    "MEM-SETUP-04": buildMemSetup04Fixture,
     "MEM-LOAD-01": buildMemLoad01Fixture,
     "MEM-LOAD-02": buildMemLoad02Fixture,
     "MEM-LOAD-03": buildMemLoad03Fixture,
@@ -13,6 +14,7 @@ export function buildFixture(testCase) {
     "MEM-SYNC-02": buildMemSync02Fixture,
     "MEM-SYNC-03": buildMemSync03Fixture,
     "MEM-SYNC-04": buildMemSync04Fixture,
+    "MEM-SYNC-05": buildMemSync05Fixture,
   };
   const build = builders[testCase.id] ?? buildGenericFixture;
   const fixture = build(testCase);
@@ -55,6 +57,49 @@ Custom release checklist note must remain.
       missing(".wingman/memory/projectBrief.md", "markdown"),
       missing(".wingman/memory/activeContext.md", "markdown"),
       missing(".wingman/memory/domains/README.md", "markdown"),
+      missing(".wingman/memory/archive/README.md", "markdown"),
+    ],
+  };
+}
+
+function buildMemSetup04Fixture() {
+  return {
+    files: [
+      file(".wingman/memory/projectBrief.md", md(`# Project Brief
+
+## 0. Memory Settings
+- **Language**: \`zh-CN\`
+
+## 1. Architecture Decisions (ADR - Global Rules)
+- 所有 checkout 支付状态字段必须在 domain memory 中显式登记。 [WHY]: 防止 API 字段迁移期间出现无声 fallback。
+
+## 2. Domain Registry
+- \`checkout\`: read when work touches checkout payment, order status, fulfillment, or refunds.
+`)),
+      file(".wingman/memory/activeContext.md", md(`# Active Context
+
+## Pending Tasks
+- [ ] Verify checkout payment status rollout after next webhook deployment.
+
+---
+## Current Sprint Logs
+### [2026-05-07] Checkout payment rollout context
+- **目标**: 保留 checkout 支付状态迁移的当前上下文。
+- **核心文件明细**:
+  - \`src/checkoutWebhook.ts\`: nextStatus - payment webhook 仍在迁移观察期。
+- **遗留问题/备注**: 不要重写这条手工维护的当前日志。
+`)),
+      file(".wingman/memory/domains/README.md", domainReadme()),
+      file(".wingman/memory/domains/checkout.md", md(`# Checkout Domain
+
+## Current Truths
+- \`payment_status\` 是 checkout 支付状态的 canonical field。 [WHY]: 用户已确认支付状态不能从订单状态推断。
+  - **Evidence**: existing memory
+  - **Applies When**: checkout payment display and webhook mapping
+
+## Notes
+- Preserve this hand-written checkout note during memory setup.
+`)),
       missing(".wingman/memory/archive/README.md", "markdown"),
     ],
   };
@@ -198,6 +243,39 @@ function buildMemSync02Fixture() {
 
 ## Current Truths
 - Legacy note: \`order_status\` was once used as a fallback for payment UI. [WHY]: Historical migration note.
+`)),
+      input(".wingman/memory/domains/auth.md", md(`# Auth Domain
+
+## Current Truths
+- Auth tokens expire after 30 minutes. [WHY]: Security policy.
+`)),
+      input(".wingman/memory/domains/billing.md", md(`# Billing Domain
+
+## Current Truths
+- Billing exports use invoice status. [WHY]: Accounting integration contract.
+`)),
+    ],
+  };
+}
+
+function buildMemSync05Fixture() {
+  return {
+    files: [
+      file(".wingman/memory/projectBrief.md", projectBriefWithDomains(["checkout", "auth", "billing"])),
+      file(".wingman/memory/activeContext.md", activeContext("Partial checkout contract conflict is being resolved.")),
+      file(".wingman/memory/domains/README.md", domainReadme()),
+      file(".wingman/memory/domains/checkout.md", md(`# Checkout Domain
+
+## Current Truths
+- Refund status uses \`refund_status\` and must not be inferred from \`payment_status\`. [WHY]: Refund lifecycle can continue after payment succeeds.
+  - **Evidence**: existing memory
+  - **Applies When**: checkout refund display and refund reconciliation
+- Payment UI may fall back from missing \`payment_status\` to \`order_status\` during migration. [WHY]: Historical temporary fallback from the old provider migration.
+  - **Evidence**: old migration note
+  - **Applies When**: checkout payment display
+- Fulfillment starts only after order status is \`paid\`. [WHY]: Shipment must not start before confirmed payment.
+  - **Evidence**: existing memory
+  - **Applies When**: checkout fulfillment and webhook status transitions
 `)),
       input(".wingman/memory/domains/auth.md", md(`# Auth Domain
 

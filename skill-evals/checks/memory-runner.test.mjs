@@ -17,10 +17,11 @@ test("memory case catalog exposes detailed smoke cases in the standard shape", a
   );
   const cases = definition.parseCasesFromReport(casesDoc);
 
-  assert.equal(cases.length, 11);
+  assert.equal(cases.length, 13);
   assert.deepEqual(cases.map((testCase) => testCase.id), [
     "MEM-SETUP-01",
     "MEM-SETUP-02",
+    "MEM-SETUP-04",
     "MEM-SETUP-03",
     "MEM-LOAD-01",
     "MEM-LOAD-02",
@@ -28,6 +29,7 @@ test("memory case catalog exposes detailed smoke cases in the standard shape", a
     "MEM-LOAD-04",
     "MEM-SYNC-01",
     "MEM-SYNC-02",
+    "MEM-SYNC-05",
     "MEM-SYNC-03",
     "MEM-SYNC-04",
   ]);
@@ -47,6 +49,8 @@ test("memory case catalog exposes detailed smoke cases in the standard shape", a
   assert.doesNotMatch(casesDoc, /\.cursor\/rules/);
   assert.doesNotMatch(casesDoc, /平台入口/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-02").focus, /遵守 `projectBrief\.md` 的 `Language: zh-CN`/);
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SETUP-04").focus, /不能整文件覆盖已有 `projectBrief\.md`/);
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-05").focus, /只替换或修正与 `payment_status`\/`order_status` 冲突/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /短路/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /不能读取 memory/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /不能额外修改业务代码/);
@@ -113,9 +117,9 @@ test("memory sync prompt treats completed work as memory-only sync", () => {
 
   assert.match(prompt, /memory-sync 用例中，场景描述的工作视为已经完成/);
   assert.match(prompt, /不要为了满足 eval 再修改业务代码/);
-  assert.match(prompt, /不要读取、创建或修改 `\.wingman\/memory`/);
   assert.match(prompt, /Memory files used:/);
   assert.doesNotMatch(prompt, /短路；不能读取 memory/);
+  assert.doesNotMatch(prompt, /请立即短路/);
 });
 
 test("memory setup fixture tracks only memory files", () => {
@@ -138,6 +142,16 @@ test("memory setup fixture with existing project docs treats them as inputs that
   assert.equal(byPath.get("docs/engineering.md").role, "input");
   assert.equal(byPath.get("docs/release-checklist.md").role, "input");
   assert.ok(byPath.has(".wingman/memory/projectBrief.md"));
+});
+
+test("memory setup fixture with existing memory preserves user-authored memory and tracks missing archive seed", () => {
+  const fixture = buildFixture({ id: "MEM-SETUP-04" });
+  const byPath = new Map(fixture.files.map((file) => [file.path, file]));
+
+  assert.match(byPath.get(".wingman/memory/projectBrief.md").content, /所有 checkout 支付状态字段必须/);
+  assert.match(byPath.get(".wingman/memory/activeContext.md").content, /Checkout payment rollout context/);
+  assert.match(byPath.get(".wingman/memory/domains/checkout.md").content, /Preserve this hand-written checkout note/);
+  assert.equal(byPath.get(".wingman/memory/archive/README.md").initiallyExists, false);
 });
 
 test("public memory setup docs describe memory files only", async () => {
@@ -183,6 +197,20 @@ test("memory sync domain-truth fixture includes unrelated domains to catch pollu
   assert.ok(paths.includes(".wingman/memory/domains/auth.md"));
   assert.ok(paths.includes(".wingman/memory/domains/billing.md"));
   assert.match(fixture.files.find((file) => file.path.endsWith("checkout.md")).content, /order_status/);
+});
+
+test("memory sync partial-conflict fixture preserves unrelated checkout truths for review", () => {
+  const fixture = buildFixture({ id: "MEM-SYNC-05" });
+  const checkout = fixture.files.find((file) => file.path.endsWith("checkout.md")).content;
+  const paths = fixture.files.map((file) => file.path);
+
+  assert.match(checkout, /Payment UI may fall back/);
+  assert.match(checkout, /Refund status uses `refund_status`/);
+  assert.match(checkout, /Fulfillment starts only after order status is `paid`/);
+  assert.ok(paths.includes(".wingman/memory/domains/auth.md"));
+  assert.ok(paths.includes(".wingman/memory/domains/billing.md"));
+  assert.equal(fixture.files.find((file) => file.path.endsWith("auth.md")).role, "input");
+  assert.equal(fixture.files.find((file) => file.path.endsWith("billing.md")).role, "input");
 });
 
 test("memory sync skip fixture treats completed code as input context", () => {
