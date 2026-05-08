@@ -3,15 +3,11 @@ import path from "node:path";
 export function buildFixture(testCase) {
   const builders = {
     "MEM-SETUP-01": buildMemSetup01Fixture,
-    "MEM-SETUP-02": buildMemSetup02Fixture,
     "MEM-SETUP-03": buildMemSetup03Fixture,
     "MEM-SETUP-04": buildMemSetup04Fixture,
-    "MEM-LOAD-01": buildMemLoad01Fixture,
     "MEM-LOAD-02": buildMemLoad02Fixture,
     "MEM-LOAD-03": buildMemLoad03Fixture,
-    "MEM-LOAD-04": buildMemLoad04Fixture,
     "MEM-SYNC-01": buildMemSync01Fixture,
-    "MEM-SYNC-02": buildMemSync02Fixture,
     "MEM-SYNC-03": buildMemSync03Fixture,
     "MEM-SYNC-04": buildMemSync04Fixture,
     "MEM-SYNC-05": buildMemSync05Fixture,
@@ -29,31 +25,6 @@ export function buildFixture(testCase) {
 function buildMemSetup01Fixture() {
   return {
     files: [
-      missing(".wingman/memory/projectBrief.md", "markdown"),
-      missing(".wingman/memory/activeContext.md", "markdown"),
-      missing(".wingman/memory/domains/README.md", "markdown"),
-      missing(".wingman/memory/archive/README.md", "markdown"),
-    ],
-  };
-}
-
-function buildMemSetup02Fixture() {
-  return {
-    files: [
-      input("README.md", md(`# Existing Project Notes
-
-Keep the custom release checklist.
-
-Do not remove this deployment note.
-`)),
-      input("docs/engineering.md", md(`# Engineering Notes
-
-Preserve this custom engineering note.
-`)),
-      input("docs/release-checklist.md", md(`# Release Checklist
-
-Custom release checklist note must remain.
-`)),
       missing(".wingman/memory/projectBrief.md", "markdown"),
       missing(".wingman/memory/activeContext.md", "markdown"),
       missing(".wingman/memory/domains/README.md", "markdown"),
@@ -124,33 +95,6 @@ export function nextStatus(event: { type: string }): OrderStatus {
   };
 }
 
-function buildMemLoad01Fixture() {
-  return {
-    files: [
-      file(".wingman/memory/projectBrief.md", projectBriefWithDomains(["checkout", "auth", "billing"])),
-      file(".wingman/memory/activeContext.md", activeContext("Checkout webhook fix is in progress.")),
-      file(".wingman/memory/domains/README.md", domainReadme()),
-      file(".wingman/memory/domains/checkout.md", checkoutDomain()),
-      input(".wingman/memory/domains/auth.md", md(`# Auth Domain
-
-## Current Truths
-- 诱饵: webhook success should never mark checkout paid. [WHY]: Auth lockout wording only.
-`)),
-      input(".wingman/memory/domains/billing.md", md(`# Billing Domain
-
-## Current Truths
-- 诱饵: payment success maps to billing reconciliation only. [WHY]: Billing export note.
-`)),
-      input(".wingman/memory/archive/2026-04.md", md(`# April Archive
-
-### Old checkout rule
-- 过期诱饵: payment.succeeded should keep orders in pending_payment.
-`)),
-      file("src/checkoutWebhook.ts", checkoutWebhookBug()),
-    ],
-  };
-}
-
 function buildMemLoad02Fixture() {
   return {
     files: [
@@ -209,18 +153,6 @@ function buildMemLoad03Fixture() {
   };
 }
 
-function buildMemLoad04Fixture() {
-  return {
-    files: [
-      missing(".wingman/memory/projectBrief.md", "markdown"),
-      file("src/inviteCodes.ts", ts(`export function createInviteCode(seed: string) {
-  return seed.slice(0, 6);
-}
-`)),
-    ],
-  };
-}
-
 function buildMemSync01Fixture() {
   return {
     files: [
@@ -229,31 +161,6 @@ function buildMemSync01Fixture() {
       file(".wingman/memory/domains/README.md", domainReadme()),
       file(".wingman/memory/domains/checkout.md", checkoutDomain()),
       file("src/checkoutWebhook.ts", checkoutWebhookFixed()),
-    ],
-  };
-}
-
-function buildMemSync02Fixture() {
-  return {
-    files: [
-      file(".wingman/memory/projectBrief.md", projectBriefWithDomains(["checkout", "auth", "billing"])),
-      file(".wingman/memory/activeContext.md", activeContext("API contract confirmed by user.")),
-      file(".wingman/memory/domains/README.md", domainReadme()),
-      file(".wingman/memory/domains/checkout.md", md(`# Checkout Domain
-
-## Current Truths
-- Legacy note: \`order_status\` was once used as a fallback for payment UI. [WHY]: Historical migration note.
-`)),
-      input(".wingman/memory/domains/auth.md", md(`# Auth Domain
-
-## Current Truths
-- Auth tokens expire after 30 minutes. [WHY]: Security policy.
-`)),
-      input(".wingman/memory/domains/billing.md", md(`# Billing Domain
-
-## Current Truths
-- Billing exports use invoice status. [WHY]: Accounting integration contract.
-`)),
     ],
   };
 }

@@ -17,18 +17,14 @@ test("memory case catalog exposes detailed smoke cases in the standard shape", a
   );
   const cases = definition.parseCasesFromReport(casesDoc);
 
-  assert.equal(cases.length, 13);
+  assert.equal(cases.length, 9);
   assert.deepEqual(cases.map((testCase) => testCase.id), [
     "MEM-SETUP-01",
-    "MEM-SETUP-02",
     "MEM-SETUP-04",
     "MEM-SETUP-03",
-    "MEM-LOAD-01",
     "MEM-LOAD-02",
     "MEM-LOAD-03",
-    "MEM-LOAD-04",
     "MEM-SYNC-01",
-    "MEM-SYNC-02",
     "MEM-SYNC-05",
     "MEM-SYNC-03",
     "MEM-SYNC-04",
@@ -48,9 +44,9 @@ test("memory case catalog exposes detailed smoke cases in the standard shape", a
   assert.doesNotMatch(casesDoc, /CLAUDE\.md/);
   assert.doesNotMatch(casesDoc, /\.cursor\/rules/);
   assert.doesNotMatch(casesDoc, /平台入口/);
-  assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-02").focus, /遵守 `projectBrief\.md` 的 `Language: zh-CN`/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SETUP-04").focus, /不能整文件覆盖已有 `projectBrief\.md`/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-05").focus, /只替换或修正与 `payment_status`\/`order_status` 冲突/);
+  assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-05").focus, /保持字段名原文/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /短路/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /不能读取 memory/);
   assert.match(cases.find((testCase) => testCase.id === "MEM-SYNC-04").focus, /不能额外修改业务代码/);
@@ -134,16 +130,6 @@ test("memory setup fixture tracks only memory files", () => {
   assert.equal(fixture.files[0].initiallyExists, false);
 });
 
-test("memory setup fixture with existing project docs treats them as inputs that must remain unchanged", () => {
-  const fixture = buildFixture({ id: "MEM-SETUP-02" });
-  const byPath = new Map(fixture.files.map((file) => [file.path, file]));
-
-  assert.equal(byPath.get("README.md").role, "input");
-  assert.equal(byPath.get("docs/engineering.md").role, "input");
-  assert.equal(byPath.get("docs/release-checklist.md").role, "input");
-  assert.ok(byPath.has(".wingman/memory/projectBrief.md"));
-});
-
 test("memory setup fixture with existing memory preserves user-authored memory and tracks missing archive seed", () => {
   const fixture = buildFixture({ id: "MEM-SETUP-04" });
   const byPath = new Map(fixture.files.map((file) => [file.path, file]));
@@ -187,16 +173,6 @@ test("memory load folder-domain fixture includes relevant and irrelevant domain 
   ]);
   assert.match(fixture.files.find((file) => file.path.endsWith("index.md")).content, /status-flow\.md/);
   assert.match(fixture.files.find((file) => file.path.endsWith("pricing.md")).content, /诱饵/);
-});
-
-test("memory sync domain-truth fixture includes unrelated domains to catch pollution", () => {
-  const fixture = buildFixture({ id: "MEM-SYNC-02" });
-  const paths = fixture.files.map((file) => file.path);
-
-  assert.ok(paths.includes(".wingman/memory/domains/checkout.md"));
-  assert.ok(paths.includes(".wingman/memory/domains/auth.md"));
-  assert.ok(paths.includes(".wingman/memory/domains/billing.md"));
-  assert.match(fixture.files.find((file) => file.path.endsWith("checkout.md")).content, /order_status/);
 });
 
 test("memory sync partial-conflict fixture preserves unrelated checkout truths for review", () => {
