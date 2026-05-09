@@ -20,7 +20,7 @@ A typical Wingman-assisted task looks like this:
 4. Before reporting meaningful work as complete, `memory-sync` records durable progress and decisions when they are worth remembering.
 5. `memory-setup` and `react-ts-refactor` are explicit workflows. They run only when the user directly asks for them.
 
-Wingman is not a full development methodology. It does not force TDD, subagents, hooks, or a universal planning process. It focuses on making agents steadier in existing projects by preserving context, aligning contracts, and avoiding duplicate implementations.
+Wingman is not a rigid development process. Small edits can stay small. Larger changes can still use tests, planning, review, or delegation when the task calls for them. Wingman focuses on making agents steadier in existing projects by preserving context, aligning contracts, and avoiding duplicate implementations.
 
 ## Principles
 
@@ -68,6 +68,7 @@ Use as Wingman's plugin entry protocol when a platform supports startup or expli
 It defines:
 
 - instruction priority between users, project-local instructions, Wingman, and default model behavior
+- cross-platform skill access and tool adaptation guidance
 - safe editing rules for real file changes versus abbreviated chat snippets
 - capability discovery across Wingman skills
 - language behavior and platform wrapper expectations
