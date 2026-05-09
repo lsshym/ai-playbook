@@ -151,9 +151,7 @@ loadUserLocalPlugin wingman loaded
 │   │   └── SKILL.md
 │   ├── reuse-catalog/
 │   │   └── SKILL.md
-│   ├── refactor/
-│   │   └── SKILL.md
-│   └── refactor-types/
+│   └── react-ts-refactor/
 │       └── SKILL.md
 ├── assets/
 ├── README.md

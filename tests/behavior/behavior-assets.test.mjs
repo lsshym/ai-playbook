@@ -44,7 +44,7 @@ test("explicit-skill-requests 行为测试资产必须完整", async () => {
   const skillNames = await collectSkillNames();
 
   assert.equal(expectations.version, 1);
-  assert.ok(expectations.scenarios.length >= 3);
+  assert.ok(expectations.scenarios.length >= 2);
 
   const scenarioIds = new Set();
   for (const scenario of expectations.scenarios) {

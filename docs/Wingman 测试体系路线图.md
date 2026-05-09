@@ -35,7 +35,7 @@ Wingman 的现有测试集中在发布前静态校验和轻量行为约束上。
 - 检查所有 `skills/*/SKILL.md` 是否有合法 frontmatter。
 - 检查 skill `description` 是否以 `Use when` 开头，保持 trigger-focused 写法。
 - 检查 `using-wingman` 是否显式覆盖所有已打包 skill。
-- 检查 `memory-setup`、`refactor`、`refactor-types` 这类显式 workflow 是否仍然保留“必须用户明确请求”的 gating。
+- 检查 `memory-setup`、`react-ts-refactor` 这类显式 workflow 是否仍然保留“必须用户明确请求”的 gating。
 - 检查 `package.json.files` 是否覆盖发布包必须包含的 manifests、skills、hooks、assets 和根文档。
 - 当 manifest 链接到 `PRIVACY.md` 或 `TERMS.md` 时，检查这些 policy 文件是否进入发布包。
 - 检查 Cursor、Codex、Claude/Codex marketplace wrapper 是否保持本地安装布局。
@@ -71,7 +71,7 @@ Wingman 的现有测试集中在发布前静态校验和轻量行为约束上。
 当前测试还没有完全对标 Superpowers，主要缺少以下能力：
 
 - live `skill-triggering` 行为测试：还没有用真实 Claude Code、Codex 或 Cursor runner 自动验证模型是否会触发 `memory-load`、`reuse-select`、`align-contracts` 等 skill。
-- live `explicit-skill-requests` 运行时测试：还没有用真实 agent 日志验证用户明确说“使用 memory-sync / refactor”时，agent 是否真的先加载并遵守对应 skill。
+- live `explicit-skill-requests` 运行时测试：还没有用真实 agent 日志验证用户明确说“使用 memory-sync / react-ts-refactor”时，agent 是否真的先加载并遵守对应 skill。
 - 平台运行时加载测试：还没有真的启动 Claude Code、Cursor、Codex、OpenCode 去验证插件能被平台发现和加载。
 - marketplace 安装测试：还没有从 GitHub marketplace source 模拟安装 Wingman。
 - 跨平台同步测试：还没有类似 Superpowers `codex-plugin-sync` 的测试，验证多个平台 wrapper 是否从同一个内容源同步生成。
@@ -106,7 +106,7 @@ Wingman 的现有测试集中在发布前静态校验和轻量行为约束上。
   - 重建已有实现前应触发 `reuse-select`。
   - 普通任务不应触发 `memory-setup`。
 - 已完成：建立 `tests/explicit-skill-requests/`。
-- 已完成：为 `memory-sync`、`refactor`、`refactor-types` 写显式请求场景。
+- 已完成：为 `memory-sync`、`react-ts-refactor` 写显式请求场景。
 - 已完成：新增 `EXPECTATIONS.json` 和 `manual-results.zh-CN.md`，由 `npm test` 检查 prompt、expectation、引用 skill、人工审核记录是否完整。
 - 待后续可选：接入真实 Claude Code、Codex 或 Cursor live runner，自动读取这些 prompt 并断言 agent 日志。
 

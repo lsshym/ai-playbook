@@ -26,7 +26,7 @@
       "id": "no-memory-setup-for-ordinary-task",
       "prompt": "prompts/no-memory-setup-for-ordinary-task.md",
       "expectedSkills": [],
-      "forbiddenSkills": ["memory-setup", "refactor", "refactor-types"],
+      "forbiddenSkills": ["memory-setup", "react-ts-refactor"],
       "reason": "A typo fix is trivial and must not initialize memory or enter explicit workflows."
     }
   ]

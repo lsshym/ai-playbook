@@ -92,8 +92,7 @@ const skillNames = [
   "memory-load",
   "memory-setup",
   "memory-sync",
-  "refactor",
-  "refactor-types",
+  "react-ts-refactor",
   "reuse-catalog",
   "reuse-select",
   "using-wingman",
@@ -214,13 +213,12 @@ function renderReadme() {
 - \`memory-load\`
 - \`memory-setup\`
 - \`memory-sync\`
-- \`refactor\`
-- \`refactor-types\`
+- \`react-ts-refactor\`
 - \`reuse-catalog\`
 - \`reuse-select\`
 - \`using-wingman\`
 
-Aliases: /reuse-catalog, /reuse-select, /memory-setup, /refactor, /refactor-types.
+Aliases: /reuse-catalog, /reuse-select, /memory-setup, /react-ts-refactor.
 `;
 }
 
@@ -230,8 +228,7 @@ function renderSkill(skillName) {
     "memory-load": "Load memory for non-trivial work touching business logic, debugging, refactor, or existing behavior. Skip trivial tasks.\n",
     "memory-setup": "Use only when explicitly requested through /memory-setup. Do not use for ordinary work.\n",
     "memory-sync": "Use after meaningful work that records business rules and durable decisions.\n",
-    refactor: "Use /refactor only when explicitly requested. Do not use for ordinary refactoring or direct code edits.\n",
-    "refactor-types": "Use /refactor-types only when explicitly requested. Do not use for ordinary TypeScript fixes or direct type edits.\n",
+    "react-ts-refactor": "Use /react-ts-refactor only when explicitly requested for React and TypeScript components. Do not use for non-React code or direct edits.\n",
     "reuse-catalog": "Use /reuse-catalog when recording exactly one reusable item into the registry.\n",
     "reuse-select": "Use /reuse-select to decide whether to reuse, extend, wrap, or create an implementation.\n",
     "using-wingman": skillNames.map((name) => `- \`${name}\``).join("\n"),

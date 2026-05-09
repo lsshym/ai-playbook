@@ -41,8 +41,7 @@ const defaultAliasMap = {
   "/reuse-catalog": "reuse-catalog",
   "/reuse-select": "reuse-select",
   "/memory-setup": "memory-setup",
-  "/refactor": "refactor",
-  "/refactor-types": "refactor-types",
+  "/react-ts-refactor": "react-ts-refactor",
 };
 
 const defaultSkillTriggerContracts = [
@@ -71,12 +70,8 @@ const defaultSkillTriggerContracts = [
     phrases: ["explicitly", "ordinary work", "/memory-setup"],
   },
   {
-    skill: "refactor",
-    phrases: ["explicitly", "ordinary refactoring", "direct code edits"],
-  },
-  {
-    skill: "refactor-types",
-    phrases: ["explicitly", "ordinary typescript fixes", "direct type edits"],
+    skill: "react-ts-refactor",
+    phrases: ["explicitly", "react", "typescript", "direct edits"],
   },
 ];
 

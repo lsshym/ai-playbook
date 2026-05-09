@@ -1,8 +1,8 @@
 # Wingman
 
-> A cross-platform AI coding plugin for steadier code changes.
+> A cross-platform AI coding workflow plugin for steadier work in real projects.
 
-Wingman is a cross-platform AI coding plugin that gives agents project memory, contract checks, and reuse workflows so they can make steadier code changes with less context loss and duplicated work.
+Wingman is a cross-platform AI coding workflow plugin that gives agents project memory, contract checks, and reuse decisions so they can make steadier code changes with less context loss and duplicated work.
 
 ## How It Works
 
@@ -18,7 +18,7 @@ A typical Wingman-assisted task looks like this:
 2. During implementation, `align-contracts` protects provider/consumer boundaries, and `reuse-select` checks whether existing implementations should be reused.
 3. After creating or identifying something reusable, `reuse-catalog` records it in the reuse registry.
 4. Before reporting meaningful work as complete, `memory-sync` records durable progress and decisions when they are worth remembering.
-5. `memory-setup`, `refactor`, and `refactor-types` are explicit workflows. They run only when the user directly asks for them.
+5. `memory-setup` and `react-ts-refactor` are explicit workflows. They run only when the user directly asks for them.
 
 Wingman is not a full development methodology. It does not force TDD, subagents, hooks, or a universal planning process. It focuses on making agents steadier in existing projects by preserving context, aligning contracts, and avoiding duplicate implementations.
 
@@ -52,17 +52,14 @@ Wingman ships all capabilities as skills. Some skills are situational and may be
 Explicit workflow skills:
 
 - `memory-setup`
-- `refactor`
-- `refactor-types`
+- `react-ts-refactor`
 
-Slash-prefixed forms such as `/reuse-catalog`, `/reuse-select`, `/memory-setup`, `/refactor`, or `/refactor-types` are conceptual invocation aliases for skills. Specific platforms may namespace or display them differently, such as `/wingman:memory-setup` in Claude Code.
+Slash-prefixed forms such as `/reuse-catalog`, `/reuse-select`, `/memory-setup`, or `/react-ts-refactor` are conceptual invocation aliases for skills. Specific platforms may namespace or display them differently, such as `/wingman:memory-setup` in Claude Code.
 
 ## Core Engineering
 
 - `using-wingman`
 - `align-contracts`
-- `refactor`
-- `refactor-types`
 
 ### `using-wingman`
 
@@ -108,28 +105,30 @@ Use align-contracts to bind this API response into the existing React component.
 Use align-contracts to migrate this legacy DTO to the new domain model.
 ```
 
-### `refactor`
+## Explicit Diagnostics
 
-Use for plan-first logic refactoring. It produces a diagnostic table first and waits for approval before code changes.
+- `react-ts-refactor`
 
-Good fit:
+### `react-ts-refactor`
 
-- prop explosion
-- redundant aliases
-- messy deep access
-- disorganized component logic
-- nested or oversized functions
-
-### `refactor-types`
-
-Use for plan-first type refactoring. It helps separate types from logic and choose target type paths before editing code.
+Use for an explicit React + TypeScript component refactor diagnostic workflow. It combines component logic and type cleanup into one plan-first table, then waits for approval before code changes.
 
 Good fit:
 
-- extracting inline types
-- reusing shared types
-- resolving type-name conflicts
-- moving local interfaces into domain type files
+- React component prop explosion
+- inline props, state, callback, or display types in TSX files
+- duplicated or partially reusable component-local type shapes
+- parent/child component contract cleanup
+- messy deep access, disorganized component logic, or nested render branches
+
+It is not a generic refactor workflow. Do not use it for backend-only code, non-React TypeScript, pure CSS, ordinary TypeScript fixes, or direct edits without an explicit request. If the diagnostic reveals API, schema, domain, or provider/consumer semantic drift, use `align-contracts` before changing meaning.
+
+Example prompt:
+
+```text
+/react-ts-refactor
+Use /react-ts-refactor to analyze this React + TypeScript component and wait for approval before edits.
+```
 
 ## Advanced Context
 

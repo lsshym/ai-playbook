@@ -25,7 +25,7 @@ Typical flow:
 2. During implementation, `align-contracts` protects provider/consumer boundaries, and `reuse-select` checks whether an existing implementation should be reused, extended, or wrapped.
 3. After creating or identifying a reusable implementation, `reuse-catalog` records it into the reuse registry.
 4. Before reporting meaningful work as complete, `memory-sync` records durable progress and decisions when they are worth remembering.
-5. `memory-setup`, `refactor`, and `refactor-types` are explicit workflows. Use them only when the user directly asks for them.
+5. `memory-setup` and `react-ts-refactor` are explicit workflows. Use them only when the user directly asks for them.
 
 Wingman does not try to be a full development methodology. It does not force TDD, subagents, hooks, or a universal planning process. It focuses on making agents steadier in existing projects by preserving context, aligning contracts, and avoiding duplicate implementations.
 
@@ -38,7 +38,7 @@ It mainly helps with:
 - project memory: load context before meaningful work, sync important outcomes afterward
 - contract alignment: avoid hiding API/type/schema meaning drift
 - reuse decisions: catalog reusable implementations and decide whether to reuse, extend, wrap, or create
-- explicit workflows: memory setup and plan-first refactor modes, only when requested
+- explicit workflows: memory setup and React + TypeScript refactor diagnostics, only when requested
 
 In a normal task, the agent first decides whether memory or reuse context is needed, uses contract checks when boundaries are involved, edits conservatively, then syncs durable knowledge if the work changed something worth remembering.
 ```
@@ -69,10 +69,9 @@ Situational skills may be used when their trigger conditions apply:
 Explicit workflow skills must only run when the user asks for them directly:
 
 - `memory-setup`: initialize Wingman memory files.
-- `refactor`: run the interactive logic refactor workflow.
-- `refactor-types`: run the interactive type refactor workflow.
+- `react-ts-refactor`: run the React + TypeScript component refactor diagnostic workflow.
 
-Slash-prefixed forms such as `/reuse-catalog`, `/reuse-select`, `/memory-setup`, `/refactor`, or `/refactor-types` are conceptual invocation aliases for skills. Specific platforms may namespace or display them differently, such as `/wingman:memory-setup` in Claude Code.
+Slash-prefixed forms such as `/reuse-catalog`, `/reuse-select`, `/memory-setup`, or `/react-ts-refactor` are conceptual invocation aliases for skills. Specific platforms may namespace or display them differently, such as `/wingman:memory-setup` in Claude Code.
 
 ## Safe Editing
 

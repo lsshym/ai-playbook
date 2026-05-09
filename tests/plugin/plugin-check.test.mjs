@@ -223,7 +223,7 @@ description: Use when loading memory
 });
 
 test("显式 workflow skill 必须保持只在用户明确请求时触发", async () => {
-  const explicitSkills = ["memory-setup", "refactor", "refactor-types"];
+  const explicitSkills = ["memory-setup", "react-ts-refactor"];
 
   for (const skillName of explicitSkills) {
     const content = await readFile(

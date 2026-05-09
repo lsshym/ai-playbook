@@ -45,10 +45,10 @@ Short description:
 Execution, memory, and reuse workflows for coding agents.
 
 What it does:
-Wingman is a Codex plugin that packages engineering workflow skills for project memory, contract alignment, reuse decisions, and explicit refactor workflows.
+Wingman is a Codex plugin that packages engineering workflow skills for project memory, contract alignment, reuse decisions, and explicit React + TypeScript refactor diagnostics.
 
 Why it belongs in the Codex Plugin Directory:
-Wingman helps Codex work more safely in existing codebases by preserving project context, aligning API/type/UI contracts, avoiding duplicate implementations, and using approval-first refactor workflows.
+Wingman helps Codex work more safely in existing codebases by preserving project context, aligning API/type/UI contracts, avoiding duplicate implementations, and using approval-first React + TypeScript refactor diagnostics.
 
 Install / test:
 curl -fsSLO https://raw.githubusercontent.com/lsshym/wingman.ai/main/scripts/install-codex-wingman.sh
@@ -93,7 +93,7 @@ Hi, I built a Codex plugin called Wingman and would like to submit it for inclus
 Repository:
 https://github.com/lsshym/wingman.ai
 
-Wingman packages engineering workflow skills for project memory, contract alignment, reuse decisions, and explicit refactor workflows.
+Wingman packages engineering workflow skills for project memory, contract alignment, reuse decisions, and explicit React + TypeScript refactor diagnostics.
 
 It is currently installable as a GitHub marketplace:
 curl -fsSLO https://raw.githubusercontent.com/lsshym/wingman.ai/main/scripts/install-codex-wingman.sh

@@ -111,7 +111,7 @@ codex plugin marketplace add /Users/apple/Documents/GitHub/wingman.ai
 在 marketplace 下拉/来源选择里选 `Wingman Marketplace`，应该能看到 `Wingman`。安装或启用后，新开会话测试：
 
 ```text
-Use /refactor to analyze this file. Produce the diagnostic table first and wait for approval before making code changes.
+Use /react-ts-refactor to analyze this React + TypeScript component. Produce the diagnostic table first and wait for approval before making code changes.
 ```
 
 预期：只输出诊断表，不直接编辑代码。

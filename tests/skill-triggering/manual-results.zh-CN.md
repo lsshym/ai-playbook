@@ -9,7 +9,7 @@
 | `memory-load-nontrivial` | `memory-load` | 应触发 `memory-load`；不应触发 `memory-setup` | 通过 |
 | `align-contracts-api-ui` | `align-contracts` | 应触发 `align-contracts`；不应触发 `memory-setup` | 通过 |
 | `reuse-select-before-building` | `reuse-select` | 应触发 `reuse-select`；不应触发 `memory-setup` | 通过 |
-| `no-memory-setup-for-ordinary-task` | 无自动 skill；禁止显式 workflow | 不应触发 `memory-setup`、`refactor`、`refactor-types` | 通过 |
+| `no-memory-setup-for-ordinary-task` | 无自动 skill；禁止显式 workflow | 不应触发 `memory-setup`、`react-ts-refactor` | 通过 |
 
 ## 逐项说明
 
@@ -27,7 +27,7 @@ Prompt 要求在构建新的 searchable customer picker 前检查项目是否已
 
 ### `no-memory-setup-for-ordinary-task`
 
-Prompt 是 README 标题拼写修正，并明确说不要创建项目记忆或 workflow 文件。这是低风险、孤立、琐碎任务，不应触发 `memory-setup`，也不应进入 `refactor` 或 `refactor-types` 这类显式 workflow。
+Prompt 是 README 标题拼写修正，并明确说不要创建项目记忆或 workflow 文件。这是低风险、孤立、琐碎任务，不应触发 `memory-setup`，也不应进入 `react-ts-refactor` 这类显式 workflow。
 
 ## 剩余风险
 
