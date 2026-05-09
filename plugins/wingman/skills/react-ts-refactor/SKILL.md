@@ -10,14 +10,14 @@ description: Use when the user explicitly invokes `/react-ts-refactor` or explic
 **Scope**: React components, JSX/TSX files, props/interfaces, local component contracts, state shapes, hooks, handlers, and component-local TypeScript types.
 **Explicit workflow**: Start only when the user directly requests this workflow.
 
-This skill merges Wingman's former logic and type refactor workflows into one React + TypeScript diagnostic pass. It is a framework-specific diagnostic workflow, not generic refactoring.
+This skill runs one diagnostic pass across React component structure, props, local types, and component logic. It is a framework-specific diagnostic workflow, not generic refactoring.
 
 ## Hard Boundaries
 
 - Do not use for backend-only code, scripts, non-React TypeScript, pure CSS, copy edits, formatting, or generic cleanup.
 - Do not use for ordinary "fix this TypeScript error" requests unless the user explicitly asks for this workflow.
 - Do not edit code in Phase 1.
-- If API, schema, domain model, backend response, persisted data, or parent/child props may have different business meanings, stop treating it as cleanup and use `align-contracts` before proposing a semantic change.
+- If API, schema, domain model, backend response, persisted data, or parent/child props may have different business meanings, report the risk and route that decision to `align-contracts`. Do not resolve semantic drift inside this workflow.
 - Preserve runtime behavior. This workflow reorganizes component and type structure; it does not change product behavior.
 
 ## Phase 1: Diagnostic & Plan (Read-Only)
@@ -50,9 +50,9 @@ Evaluate React components, hooks, props, and TypeScript types against these cate
    - **Condition**: A component receives many scalar props derived from the same source object, such as `id={product.id}` and `name={product.name}`.
    - **Action**: Consolidate into a meaningful object prop only when the child contract has the same meaning as the source object.
 
-2. **CONTRACT** (Component Contract Drift)
+2. **CONTRACT_RISK** (Component Contract Risk)
    - **Condition**: Parent and child props, display models, or local component names imply different meanings from the source data.
-   - **Action**: Preserve the concept that owns the meaning. If source-of-truth or semantics are unclear, route to `align-contracts` instead of hiding the mismatch.
+   - **Action**: Flag the possible semantic drift and recommend `align-contracts`. Do not rename, merge, delete, or remap the contract as part of this diagnostic.
 
 3. **INLINE_TYPE** (Inline Definition)
    - **Condition**: Inline object shapes appear in props, `useState`, callbacks, form state, or local helpers.
@@ -103,7 +103,7 @@ Do not execute these until the user explicitly approves with language such as "G
 2. **React Scope**: Touch only React + TypeScript component structure, props, local types, imports, and helpers needed by approved findings.
 3. **Interface Updates**: When changing props, update parent usage, child props type, and call sites together.
 4. **Type Safety**: Before deleting aliases or local types, confirm strict compatibility. Never merge semantically different types.
-5. **Contract Escalation**: If implementation reveals API/schema/domain/provider-consumer drift, pause and use `align-contracts`.
+5. **Contract Escalation**: If implementation reveals API/schema/domain/provider-consumer drift, pause. This workflow may identify the risk, but `align-contracts` owns the semantic decision.
 6. **No Unrelated Cleanup**: Do not fold formatting, styling, visual layout, dependency upgrades, or unrelated component redesign into this workflow.
 7. **Verification**: Run the project's normal proof after approved edits: typecheck, tests, lint, or focused compile.
 
