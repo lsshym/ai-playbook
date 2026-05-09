@@ -1,24 +1,47 @@
 # Copilot CLI Tool Mapping
 
-Wingman skills are platform-neutral, but some examples or upstream references may use Claude Code tool names. In Copilot CLI, adapt them to Copilot's available tools.
+Skills may use Claude Code tool names. When you encounter these in a skill, use the Copilot CLI equivalent:
 
-| Skill reference | Copilot CLI equivalent |
-|-----------------|------------------------|
-| `Skill` tool | `skill` |
-| `Read` | `view` |
-| `Write` | `create` |
-| `Edit` | `edit` |
-| `Bash` | `bash` |
-| `Grep` | `grep` |
-| `Glob` | `glob` |
-| `Task` tool for subagents | `task` with the appropriate agent type, only when the workflow and platform support it |
-| Task status or output | `read_agent`, `list_agents` |
-| `TodoWrite` | Copilot's todo/session tracking mechanism when available |
+| Skill references | Copilot CLI equivalent |
+|-----------------|----------------------|
+| `Read` (file reading) | `view` |
+| `Write` (file creation) | `create` |
+| `Edit` (file editing) | `edit` |
+| `Bash` (run commands) | `bash` |
+| `Grep` (search file content) | `grep` |
+| `Glob` (search files by name) | `glob` |
+| `Skill` tool (invoke a skill) | `skill` |
 | `WebFetch` | `web_fetch` |
-| `WebSearch` | No direct equivalent; use `web_fetch` with an appropriate search URL if allowed |
+| `Task` tool (dispatch subagent) | `task` with `agent_type: "general-purpose"` or `"explore"` |
+| Multiple `Task` calls (parallel) | Multiple `task` calls |
+| Task status/output | `read_agent`, `list_agents` |
+| `TodoWrite` (task tracking) | `sql` with built-in `todos` table |
+| `WebSearch` | No equivalent; use `web_fetch` with a search engine URL |
+| `EnterPlanMode` / `ExitPlanMode` | No equivalent; stay in the main session |
 
-## Notes
+## Async shell sessions
+
+Copilot CLI supports persistent async shell sessions, which have no direct Claude Code equivalent:
+
+| Tool | Purpose |
+|------|---------|
+| `bash` with `async: true` | Start a long-running command in the background |
+| `write_bash` | Send input to a running async session |
+| `read_bash` | Read output from a running async session |
+| `stop_bash` | Terminate an async session |
+| `list_bash` | List all active shell sessions |
+
+## Additional Copilot CLI tools
+
+| Tool | Purpose |
+|------|---------|
+| `store_memory` | Persist facts about the codebase for future sessions |
+| `report_intent` | Update the UI status line with current intent |
+| `sql` | Query the session's SQLite database, including todos and metadata |
+| `fetch_copilot_cli_documentation` | Look up Copilot CLI documentation |
+| GitHub MCP tools (`github-mcp-server-*`) | Native GitHub API access for issues, PRs, and code search |
+
+## Wingman Notes
 
 - Skills are auto-discovered from installed plugins.
-- Use Copilot's async shell session tools when a long-running command must stay alive.
-- Do not assume every Wingman workflow needs subagents.
+- Wingman does not require subagents by default. Use Copilot subagents only when the user explicitly asks for subagents or the active workflow genuinely requires parallel agent work.

@@ -1,21 +1,55 @@
 # Codex Tool Mapping
 
-Wingman skills are platform-neutral, but some examples or upstream references may use Claude Code tool names. In Codex, adapt them to the available Codex tools and the current sandbox rules.
+Skills may use Claude Code tool names. When you encounter these in a skill, use the Codex equivalent:
 
 | Skill reference | Codex equivalent |
 |-----------------|------------------|
-| `Skill` tool | Use Codex's native skill loading behavior. If a skill is already loaded in context, follow it directly. |
-| `TodoWrite` | `update_plan` |
-| `Task` tool for subagents | `spawn_agent`, only when the user explicitly asks for subagents or parallel agent work |
-| Task result | `wait_agent` |
-| Finished spawned agent | `close_agent` when no longer needed |
-| `Bash` | `exec_command` |
-| `Read`, `Write`, `Edit` | Use native file-reading tools and `apply_patch` for manual edits |
-| `Grep`, `Glob` | `rg`, `rg --files`, or native search tools |
+| `Task` tool (dispatch subagent) | `spawn_agent` (see [Subagent dispatch requires multi-agent support](#subagent-dispatch-requires-multi-agent-support)) |
+| Multiple `Task` calls (parallel) | Multiple `spawn_agent` calls |
+| Task returns result | `wait_agent` |
+| Task completes automatically | `close_agent` to free slot |
+| `TodoWrite` (task tracking) | `update_plan` |
+| `Skill` tool (invoke a skill) | Skills load natively; just follow the instructions |
+| `Read`, `Write`, `Edit` (files) | Use native file tools; for manual edits, prefer `apply_patch` |
+| `Grep`, `Glob` (search) | Use `rg`, `rg --files`, or native search tools |
+| `Bash` (run commands) | `exec_command` |
 
-## Notes
+## Subagent dispatch requires multi-agent support
 
-- Do not introduce subagents just because a copied workflow mentions `Task`. In Codex, spawn agents only when explicitly allowed by the current instructions or the user.
-- Respect sandbox and escalation requirements for shell commands.
-- Prefer `rg` and `rg --files` for local search.
-- Use `apply_patch` for manual file edits.
+Codex subagents require multi-agent support. If `spawn_agent`, `wait_agent`, or `close_agent` are not available, continue in the main session and explain the limitation when it affects the requested workflow.
+
+When available, Codex may require this config in `~/.codex/config.toml`:
+
+```toml
+[features]
+multi_agent = true
+```
+
+Legacy note: Codex builds before `rust-v0.115.0` exposed spawned-agent waiting as `wait`. Current Codex uses `wait_agent` for spawned agents. The `wait` name now belongs to code-mode `exec/wait`, which resumes a yielded exec cell by `cell_id`; it is not the spawned-agent result tool.
+
+## Environment Detection
+
+Skills that create worktrees or finish branches should detect their environment with read-only git commands before proceeding:
+
+```bash
+GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
+GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
+BRANCH=$(git branch --show-current)
+```
+
+- `GIT_DIR != GIT_COMMON` -> already in a linked worktree; skip creation.
+- `BRANCH` empty -> detached HEAD; cannot branch, push, or PR from the sandbox.
+
+## Codex App Finishing
+
+When the sandbox blocks branch or push operations, such as detached HEAD in an externally managed worktree, the agent should commit all work it can commit and inform the user to use the app's native controls:
+
+- **Create branch**: names the branch, then commits, pushes, or opens the PR through the app UI.
+- **Hand off to local**: transfers work to the user's local checkout.
+
+The agent can still run tests, stage files, and provide suggested branch names, commit messages, and PR descriptions.
+
+## Wingman Notes
+
+- Wingman does not require subagents by default. Use Codex subagents only when the user explicitly asks for subagents or the active workflow genuinely requires parallel agent work.
+- Respect Codex sandbox and escalation requirements for shell commands.
