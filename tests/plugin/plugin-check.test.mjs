@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
 
 import {
   collectProjectIssues,
@@ -15,6 +17,7 @@ import {
 } from "../../scripts/check-plugin.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
+const execFileAsync = promisify(execFile);
 
 test("当前插件包通过全部发布前检查", async () => {
   const issues = await collectProjectIssues(repoRoot);
@@ -277,6 +280,62 @@ test("Codex payload 同步脚本必须指向 plugins/wingman 嵌入目录", asyn
   assert.match(script, /--exclude "\.eval-runs\/"/);
   assert.match(script, /--exclude "\.agents\/"/);
   assert.match(script, /--exclude "install-codex-wingman\.sh"/);
+});
+
+test("Cursor SessionStart hook 必须通过跨平台 wrapper 执行", async () => {
+  const cursorHooks = JSON.parse(
+    await readFile(path.join(repoRoot, "hooks", "hooks-cursor.json"), "utf8"),
+  );
+
+  assert.equal(
+    cursorHooks.hooks.sessionStart[0].command,
+    "./hooks/run-hook.cmd session-start",
+  );
+});
+
+test("SessionStart hook 在各平台分支都输出合法 JSON context", async () => {
+  const cases = [
+    {
+      name: "cursor",
+      env: { CURSOR_PLUGIN_ROOT: repoRoot },
+      extract: (output) => output.additional_context,
+    },
+    {
+      name: "claude",
+      env: { CLAUDE_PLUGIN_ROOT: repoRoot },
+      extract: (output) => output.hookSpecificOutput?.additionalContext,
+    },
+    {
+      name: "default",
+      env: {},
+      extract: (output) => output.additionalContext,
+    },
+  ];
+
+  for (const testCase of cases) {
+    const { stdout } = await execFileAsync("bash", ["hooks/session-start"], {
+      cwd: repoRoot,
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        ...testCase.env,
+      },
+    });
+    const output = JSON.parse(stdout);
+    const context = testCase.extract(output);
+
+    assert.equal(typeof context, "string", `${testCase.name} should include context`);
+    assert.match(context, /You have Wingman/);
+    assert.match(context, /wingman:using-wingman/);
+  }
+});
+
+test("Windows hook wrapper 不应硬编码最多 8 个透传参数", async () => {
+  const wrapper = await readFile(path.join(repoRoot, "hooks", "run-hook.cmd"), "utf8");
+
+  assert.doesNotMatch(wrapper, /%2 %3 %4 %5 %6 %7 %8 %9/);
+  assert.match(wrapper, /shift \/1/);
+  assert.match(wrapper, /%ARGS%/);
 });
 
 test("Codex marketplace payload 必须提交在 plugins/wingman 并与源码同步", async () => {

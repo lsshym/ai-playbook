@@ -16,21 +16,24 @@ if "%~1"=="" (
 )
 
 set "HOOK_DIR=%~dp0"
+set "SCRIPT_NAME=%~1"
+shift /1
+set "ARGS=%*"
 
 REM Try Git for Windows bash in standard locations.
 if exist "C:\Program Files\Git\bin\bash.exe" (
-    "C:\Program Files\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
+    "C:\Program Files\Git\bin\bash.exe" "%HOOK_DIR%%SCRIPT_NAME%" %ARGS%
     exit /b %ERRORLEVEL%
 )
 if exist "C:\Program Files (x86)\Git\bin\bash.exe" (
-    "C:\Program Files (x86)\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
+    "C:\Program Files (x86)\Git\bin\bash.exe" "%HOOK_DIR%%SCRIPT_NAME%" %ARGS%
     exit /b %ERRORLEVEL%
 )
 
 REM Try bash on PATH (e.g. user-installed Git Bash, MSYS2, Cygwin).
 where bash >nul 2>nul
 if %ERRORLEVEL% equ 0 (
-    bash "%HOOK_DIR%%~1" %2 %3 %4 %5 %6 %7 %8 %9
+    bash "%HOOK_DIR%%SCRIPT_NAME%" %ARGS%
     exit /b %ERRORLEVEL%
 )
 

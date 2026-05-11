@@ -141,7 +141,7 @@ export async function createPluginFixture(options = {}) {
       hooks: {
         sessionStart: [
           {
-            command: "./hooks/session-start",
+            command: "./hooks/run-hook.cmd session-start",
           },
         ],
       },

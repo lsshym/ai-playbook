@@ -154,6 +154,56 @@ test("完整 package fixture 平台本地安装布局漂移时必须报错", asy
   }
 });
 
+test("完整 package fixture 插件运行入口不应指向评估或测试资产", async () => {
+  const root = await createPluginFixture({
+    codexPlugin: {
+      skills: "./skill-evals/",
+      interface: {
+        composerIcon: "./assets/icon.svg",
+        logo: "./tests/icon.svg",
+      },
+    },
+    cursorPlugin: {
+      hooks: "./.eval-runs/hooks.json",
+    },
+    codexMarketplace: {
+      plugins: [
+        {
+          name: "wingman",
+          source: {
+            source: "local",
+            path: "./tests/wingman",
+          },
+          policy: {
+            installation: "AVAILABLE",
+            authentication: "ON_INSTALL",
+          },
+          category: "Coding",
+        },
+      ],
+    },
+  });
+
+  try {
+    const issues = await collectProjectIssues(root);
+
+    assert.deepEqual(issues, [
+      ".codex-plugin/plugin.json: skills path should be ./skills/ for shared local install layout",
+      ".cursor-plugin/plugin.json: hooks path should be ./hooks/hooks-cursor.json for local install layout",
+      ".agents/plugins/marketplace.json: plugins[0].source.path should be ./plugins/wingman for local install layout",
+      ".codex-plugin/plugin.json: skills path must not point at development-only path: skill-evals",
+      ".cursor-plugin/plugin.json: hooks path must not point at development-only path: .eval-runs/hooks.json",
+      ".codex-plugin/plugin.json: interface.logo must not point at development-only path: tests/icon.svg",
+      ".agents/plugins/marketplace.json: plugins[0].source.path must not point at development-only path: tests/wingman",
+      ".codex-plugin/plugin.json: skills path does not exist: skill-evals",
+      ".cursor-plugin/plugin.json: hooks path does not exist: .eval-runs/hooks.json",
+      ".codex-plugin/plugin.json: interface.logo does not exist: tests/icon.svg",
+    ]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("完整 package fixture hook smoke test 失败时必须报错", async () => {
   const root = await createPluginFixture({
     fileOverrides: {

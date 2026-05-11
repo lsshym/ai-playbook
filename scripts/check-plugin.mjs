@@ -37,6 +37,12 @@ const requiredPackageFiles = [
   "LICENSE",
 ];
 
+const developmentOnlyPathPrefixes = [
+  ".eval-runs",
+  "skill-evals",
+  "tests",
+];
+
 const defaultAliasMap = {
   "/reuse-catalog": "reuse-catalog",
   "/reuse-select": "reuse-select",
@@ -199,6 +205,7 @@ export async function collectProjectIssues(repoRoot = rootFromImport) {
   issues.push(...validateCrossPlatformMetadata(json));
   issues.push(...(await validatePackageContents(repoRoot, json)));
   issues.push(...validateLocalInstallLayout(json));
+  issues.push(...validateRuntimeReferenceBoundaries(json));
   issues.push(...(await validateReferencedPaths(repoRoot, json)));
   issues.push(...(await validateSkills(repoRoot)));
   issues.push(...(await validateReadmeSkillCoverage(repoRoot)));
@@ -263,6 +270,13 @@ export function validateLocalInstallLayout(json) {
     issues,
     "for local install layout",
   );
+  requireExactJsonValue(
+    json["hooks/hooks-cursor.json"]?.hooks?.sessionStart?.[0]?.command,
+    "./hooks/run-hook.cmd session-start",
+    "hooks/hooks-cursor.json: sessionStart command",
+    issues,
+    "for cross-platform hook execution",
+  );
 
   const marketplacePlugin = json[".agents/plugins/marketplace.json"]?.plugins?.[0];
   requireExactJsonValue(
@@ -279,6 +293,49 @@ export function validateLocalInstallLayout(json) {
     issues,
     "for local install layout",
   );
+
+  return issues;
+}
+
+export function validateRuntimeReferenceBoundaries(json) {
+  const issues = [];
+  const refs = [
+    [
+      ".codex-plugin/plugin.json: skills path",
+      json[".codex-plugin/plugin.json"]?.skills,
+    ],
+    [
+      ".cursor-plugin/plugin.json: skills path",
+      json[".cursor-plugin/plugin.json"]?.skills,
+    ],
+    [
+      ".cursor-plugin/plugin.json: hooks path",
+      json[".cursor-plugin/plugin.json"]?.hooks,
+    ],
+    [
+      "hooks/hooks-cursor.json: sessionStart command",
+      commandPath(json["hooks/hooks-cursor.json"]?.hooks?.sessionStart?.[0]?.command),
+    ],
+    [
+      ".codex-plugin/plugin.json: interface.composerIcon",
+      json[".codex-plugin/plugin.json"]?.interface?.composerIcon,
+    ],
+    [
+      ".codex-plugin/plugin.json: interface.logo",
+      json[".codex-plugin/plugin.json"]?.interface?.logo,
+    ],
+    [
+      ".agents/plugins/marketplace.json: plugins[0].source.path",
+      json[".agents/plugins/marketplace.json"]?.plugins?.[0]?.source?.path,
+    ],
+  ];
+
+  for (const [label, value] of refs) {
+    const rel = developmentOnlyReference(value);
+    if (rel) {
+      issues.push(`${label} must not point at development-only path: ${rel}`);
+    }
+  }
 
   return issues;
 }
@@ -483,7 +540,7 @@ async function validateReferencedPaths(repoRoot, json) {
   await requireJsonPath(repoRoot, json[".codex-plugin/plugin.json"]?.interface?.composerIcon, issues, ".codex-plugin/plugin.json: interface.composerIcon");
   await requireJsonPath(repoRoot, json[".codex-plugin/plugin.json"]?.interface?.logo, issues, ".codex-plugin/plugin.json: interface.logo");
 
-  const cursorHook = json["hooks/hooks-cursor.json"]?.hooks?.sessionStart?.[0]?.command;
+  const cursorHook = commandPath(json["hooks/hooks-cursor.json"]?.hooks?.sessionStart?.[0]?.command);
   await requireJsonPath(repoRoot, cursorHook, issues, "hooks/hooks-cursor.json: sessionStart command");
   await requirePath(repoRoot, "hooks/run-hook.cmd", issues, "hooks/hooks.json: SessionStart command");
 
@@ -551,6 +608,26 @@ async function requirePath(repoRoot, rel, issues, label) {
 
 function normalizeRelativePath(value) {
   return value.replace(/^\.\//, "").replace(/\/$/, "");
+}
+
+function developmentOnlyReference(value) {
+  if (!isNonEmptyString(value)) return null;
+  if (value.startsWith("http://") || value.startsWith("https://")) return null;
+
+  const normalized = normalizeRelativePath(value);
+  return developmentOnlyPathPrefixes.some(
+    (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
+  )
+    ? normalized
+    : null;
+}
+
+function commandPath(value) {
+  if (!isNonEmptyString(value)) return value;
+  const trimmed = value.trim();
+  const quoted = trimmed.match(/^"([^"]+)"/);
+  if (quoted) return quoted[1];
+  return trimmed.split(/\s+/)[0];
 }
 
 function collectLinkedPolicyFiles(json) {
